@@ -24,22 +24,22 @@ contains
   end function kdelta
 
   subroutine rk4gn(f,x,yi,yf,h,n)
-    !===========================================================!
-    ! Solve n first-order ODEs or n/2 second-order.             !
-    ! Runge-Kutta 4 Gill's method                               !
-    ! Daniel Celis Garza 24 Sept. 2015                          !
-    !-----------------------------------------------------------!
-    ! f(y,x,dx,n)   = ODEs to be solved                         !
-    ! x             = independent variable @ step i             !
-    ! yi()          = array of dependent variables @ step i     !
-    ! ys()          = array of dependent variables @ stage s    !
-    ! yf()          = array of dependent variables @ step i+1   !
-    ! n             = ODE system dimension                      !
-    !-----------------------------------------------------------!
-    ! j             = counter variable                          !
-    ! h             = step size                                 !
-    ! ki()          = array of Runge-Kutta k's                  !
-    !===========================================================!
+    !================================================================!
+    ! Solve n first-order ODEs or n/2 second-order.                  !
+    ! Runge-Kutta 4 Gill's method                                    !
+    ! Daniel Celis Garza 24 Sept. 2015                               !
+    !----------------------------------------------------------------!
+    ! f(x,y,dy,n) = ODEs to be solved                                !
+    ! n           = ODE system dimension                             !
+    ! h           = step size                                        !
+    ! x           = independent variable @ step i                    !
+    ! yi()        = array of dependent variables @ step i            !
+    ! ys()        = array of dependent variables @ stage s of step i !
+    ! yf()        = array of dependent variables @ step i+1          !
+    ! er()        = array of integration errors                      !
+    ! ki()        = array of Runge-Kutta k/h                         !
+    ! j           = counter variable                                 !
+    !================================================================!
     integer n, j
     double precision x,dy(n),yi(n),ys(n),yf(n),&
                      k1(n),k2(n),k3(n),k4(n),&
@@ -73,22 +73,26 @@ contains
   end subroutine rk4gn
 
   subroutine rkckn(f,x,yi,yf,er,h,n)
-    !===========================================================!
-    ! Solve n first-order ODEs or n/2 second-order.             !
-    ! Runge-Kutta 4 Gill's method                               !
-    ! Daniel Celis Garza 24 Sept. 2015                          !
-    !-----------------------------------------------------------!
-    ! f(y,x,dx,n)   = ODEs to be solved                         !
-    ! x             = independent variable @ step i             !
-    ! yi()          = array of dependent variables @ step i     !
-    ! ys()          = array of dependent variables @ stage s    !
-    ! yf()          = array of dependent variables @ step i+1   !
-    ! n             = ODE system dimension                      !
-    !-----------------------------------------------------------!
-    ! j             = counter variable                          !
-    ! h             = step size                                 !
-    ! ki()          = array of Runge-Kutta k's                  !
-    !===========================================================!
+    !================================================================!
+    ! Solve n first-order ODEs or n/2 second-order.                  !
+    ! Cash-Karp RK45                                                 !
+    ! Daniel Celis Garza 24 Sept. 2015                               !
+    !----------------------------------------------------------------!
+    ! f(x,y,dy,n) = ODEs to be solved                                !
+    ! n           = ODE system dimension                             !
+    ! h           = step size                                        !
+    ! x           = independent variable @ step i                    !
+    ! yi()        = array of dependent variables @ step i            !
+    ! ys()        = array of dependent variables @ stage s of step i !
+    ! yf()        = array of dependent variables @ step i+1          !
+    ! er()        = array of integration errors                      !
+    ! ki()        = array of Runge-Kutta k/h                         !
+    ! ci          = Butcher Table c-vector                           !
+    ! aij         = Butcher Table A-matrix                           !
+    ! bi          = Butcher Table b-vector                           !
+    ! dbi         = b-b* vector difference for error calculation     !
+    ! j           = counter variable                                 !
+    !================================================================!
     integer n, j
     double precision x,dy(n),yi(n),ys(n),yf(n),&
                      k1(n),k2(n),k3(n),k4(n),k5(n),k6(n),er(n),&
@@ -142,9 +146,28 @@ contains
   end subroutine rkckn
 
   subroutine rkcka(f,xi,xf,yi,yf,der,h,hmin,n)
+    !================================================================!
+    ! Adaptive-step Cash-Karp RK45                                   !
+    ! Daniel Celis Garza 24 Sept. 2015                               !
+    !----------------------------------------------------------------!
+    ! f(x,y,dy,n) = ODEs to be solved                                !
+    ! n           = ODE system dimension                             !
+    ! h           = current step size                                !
+    ! ht          = trial step size                                  !
+    ! hn          = new step size                                    !
+    ! dy          = array of derivatives                             !
+    ! der         = desired error
+    ! tiny        = prevent division by zero                         !
+    ! s           = safety factor for changing h                     !
+    ! shrink      = (-1/p-1) where p is the error's order            !
+    ! grow        = (-1/p) where p is the error's order              !
+    ! ercor       = (5/s)**(1/grow), know when to increase h greatly !
+    ! yscal(j)    = scaling the error to the function's range        !
+    ! j           = counter variable                                 !
+    !================================================================!
     external f
     integer n, j
-    double precision xi,xf,xtest,yi(n),yf(n),dy(n),yscal(n),der,er(n),h,ht,hn,hmin,maxer,miner,&
+    double precision xi,xf,xtest,yi(n),yf(n),dy(n),yscal(n),der,er(n),h,ht,hn,hmin,maxer,&
                      tiny,s,shrink,grow,ercor
     parameter (tiny=1e-30,s=0.9,shrink=-0.25,grow=-0.2,ercor=1.89e-4)
     call f(xi, yi, dy, n)
@@ -168,9 +191,10 @@ contains
       if (xtest == xi) then
         ! This means that the error is so strict, h is effectively zero,
         ! so the program will enter an infinite loop.
-        ! This prevents it from doing so, by increasing h to the minimum value
+        ! Increasing h to the minimum value,
         h = hmin
-        ! and locally increasing the desired error (it will go back for the next step).
+        ! and locally increasing the desired error, we prevent this from occurring.
+        ! The error goes back to normal for the next integration step.
         der = der + .0001*der
       endif
       go to 1
