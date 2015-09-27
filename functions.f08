@@ -156,7 +156,7 @@ contains
     ! ht          = trial step size                                  !
     ! hn          = new step size                                    !
     ! dy          = array of derivatives                             !
-    ! der         = desired error
+    ! der         = desired error                                    !
     ! tiny        = prevent division by zero                         !
     ! s           = safety factor for changing h                     !
     ! shrink      = (-1/p-1) where p is the error's order            !
