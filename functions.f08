@@ -167,9 +167,10 @@ contains
     !================================================================!
     external f
     integer n, j
-    double precision xi,xf,xtest,yi(n),yf(n),dy(n),yscal(n),der,er(n),h,ht,hn,hmin,maxer,miner,&
+    double precision xi,xf,xtest,yi(n),yf(n),dy(n),yscal(n),der,local_der,er(n),h,ht,hn,hmin,maxer,miner,&
                      tiny,s,shrink,grow,ercor
     parameter (tiny=1e-30,s=0.9,shrink=-0.25,grow=-0.2,ercor=1.89e-4)
+    local_der = der
     call f(xi, yi, dy, n)
     do j = 1, n
        yscal(j) = abs(yi(j)) + abs(h*dy(j)) + tiny
@@ -182,20 +183,19 @@ contains
     do j = 1, n
       maxer = max(maxer,abs(er(j)/yscal(j)))
     end do
-    maxer = maxer/der
-
+    maxer = maxer/local_der
     if (maxer > 1.) then
       ht = s*h*maxer**shrink
       h = max(ht,0.1*h) ! Prevents jumps of more than an order of magnitude.
-      xtest = xi+h
-      if (xtest == xi) then
+      xtest = xi + h
+      if (abs(h)<hmin .or. xtest == xi) then
         ! This means that the error is so strict h is effectively zero,
         ! so the program enters an infinite loop.
-        ! Increasing h to the minimum value,
+        ! Increasing h to the minimum value.
         h = hmin
-        ! and locally increasing the desired error, we prevent this from occurring.
+        ! By locally increasing the desired error, we further prevent the infinite loop.
         ! The error goes back to normal for the next integration step.
-        der = der + .0001*der
+        local_der = local_der + der
       endif
       go to 1
     else
@@ -206,6 +206,10 @@ contains
       end if
     endif
 
+    if(abs(hn) < hmin) then
+      hn = hmin
+    endif
+
     ! Updating for the next step.
     xf = xi + h   ! Taking a step.
     h  = hn       ! Setting the next step length.
@@ -213,16 +217,5 @@ contains
     do j = 1, n
       yi(j) = yf(j) ! Setting all the dependent variables to their new starting points.
     end do
-
-    ! Making sure we don't go under the minimum value of h.
-    !if (h < hmin) then
-      ! This way of dealing with it is one of many, hmin could be made smaller automatically.
-      ! For example:
-      ! hmin = h
-      !write(*,*) 'Step size smaller than the minimum specified (', hmin, ').'
-      !write(*,*) 'Please define a new minimum value.'
-      !write(*,*) 'H_min = '
-      !read *, hmin
-    !endif
   end subroutine rkcka
 end module functions

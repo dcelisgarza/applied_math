@@ -223,6 +223,7 @@ integer, parameter :: n = 4
 double precision, parameter :: rad = 3.1415926/180.0
 double precision ti, tf, dt, tmax, thsi
 double precision xi(n), xf(n), dxi(n),er(n)
+double precision start, finish
 integer i
 external dpen
 
@@ -230,7 +231,7 @@ open(unit=1, file = 'd_pendulum.dat')
 ! initial data
 ti     = 0.0
 tmax   = 50.0
-dt     = 0.005
+dt     = 5.0e-3
 l1     = 5.0
 l2     = 9.0
 m1     = 13.0
@@ -246,7 +247,7 @@ xi(4)  = m2*l2*l2*dxi(2) + m2*l1*l2*dxi(1)*cos(thsi)
 
 ! print initial conditions
 write(1,*) ti,xi(1),xi(2),xi(3),xi(4),l1*sin(xi(1)),-l1*cos(xi(1)),l1*sin(xi(1))+l2*sin(xi(2)),-l1*cos(xi(1))-l2*cos(xi(2))
-
+CALL CPU_TIME(start)
 ! integration of ODEs
 do while(ti <= tmax)
    tf = ti + dt
@@ -262,6 +263,8 @@ end do
 
 100 format(5x,'t',11x,'x',11x,'y',11x,'dx/dt',7x,'dy/dt')
 102 format(5(1pe12.3))
+CALL CPU_TIME(finish)
+print '("Time = ",f6.3," seconds.")',finish-start
 end subroutine double_pendulum
 
 subroutine double_pendulum_adapt
@@ -272,6 +275,7 @@ integer, parameter :: n = 4
 double precision, parameter :: rad = 3.1415926/180.0
 double precision ti, tf, dt, dtmin, der, tmax, thsi
 double precision xi(n), xf(n), dxi(n)
+double precision start, finish
 integer i
 external dpen
 
@@ -279,9 +283,9 @@ open(unit=1, file = 'd_pendulum_adapt.dat')
 ! initial data
 ti     = 0.0
 tmax   = 50.0
-dt     = 0.005
-dtmin  = 0.0005
-der    = 5e-4
+dt     = 5.0e-3
+dtmin  = 4.375e-3
+der    = 1.3125e-7
 l1     = 5.0
 l2     = 9.0
 m1     = 13.0
@@ -296,15 +300,17 @@ xi(3)  = ms*l1*l1*dxi(1) + m2*l1*l2*dxi(2)*cos(thsi)
 xi(4)  = m2*l2*l2*dxi(2) + m2*l1*l2*dxi(1)*cos(thsi)
 ! print initial conditions
 write(1,*) ti,xi(1),xi(2),xi(3),xi(4),l1*sin(xi(1)),-l1*cos(xi(1)),l1*sin(xi(1))+l2*sin(xi(2)),-l1*cos(xi(1))-l2*cos(xi(2))
-
+CALL CPU_TIME(start)
 ! integration of ODEs
 do while(ti <= tmax)
   call rkcka(dpen,ti,tf,xi,xf,der,dt,dtmin,n)
   write(1,*) tf,xf(1),xf(2),xf(3),xf(4),l1*sin(xf(1)),-l1*cos(xf(1)),l1*sin(xf(1))+l2*sin(xf(2)),-l1*cos(xf(1))-l2*cos(xf(2))
 end do
-
 100 format(5x,'t',11x,'x',11x,'y',11x,'dx/dt',7x,'dy/dt')
 102 format(5(1pe12.3))
+CALL CPU_TIME(finish)
+print '("Time = ",f6.3," seconds.")',finish-start
+print*,
 end subroutine double_pendulum_adapt
 
 subroutine dpen(t,x,dx,n)
