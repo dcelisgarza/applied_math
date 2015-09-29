@@ -178,15 +178,12 @@ contains
       ! yscal(j) = abs(h*dy(j)) + tiny
     end do
 
-1   call rkckn(f,xi,yi,yf,er,h,n)
-    maxer = 0.
-    do j = 1, n
-      maxer = max(maxer,abs(er(j)/yscal(j)))
-    end do
-    maxer = maxer/local_der
-    if (maxer > 1.) then
+    do
+      call rkckn(f,xi,yi,yf,er,h,n)
+      maxer = maxval(abs(er(:)/yscal(:)))/local_der
+      if ( maxer <= 1. ) exit
       ht = s*h*maxer**shrink
-      h = max(ht,0.1*h) ! Prevents jumps of more than an order of magnitude.
+      h = sign(max(abs(ht),0.1*abs(h)),h) ! Prevents jumps of more than an order of magnitude.
       xtest = xi + h
       if (abs(h)<hmin .or. xtest == xi) then
         ! This means that the error is so strict h is effectively zero,
@@ -196,15 +193,14 @@ contains
         ! By locally increasing the desired error, we further prevent the infinite loop.
         ! The error goes back to normal for the next integration step.
         local_der = local_der + der
-      endif
-      go to 1
-    else
-      if (maxer > ercor) then
-        hn = s*h*maxer**grow
-      else
-        hn = 5.*h
       end if
-    endif
+    end do
+
+    if (maxer > ercor) then
+      hn = s*h*maxer**grow
+    else
+      hn = 5.*h
+    end if
 
     if(abs(hn) < hmin) then
       hn = hmin
