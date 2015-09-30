@@ -96,7 +96,7 @@ write(1,*) ti, xi(1)
 
 ! integration of ODEs
 do while(ti <= tmax)
-   call rkckn(pharv,ti,xi,xf,er,dt,n)
+   !call rkckn(pharv,ti,xi,xf,er,dt,n)
    tf = ti + dt
    write(1,*) tf, xf(1)
 
@@ -140,7 +140,7 @@ write(1,*) ti, xi(1)
 
 ! integration of ODEs
 do while(ti <= tmax)
-  call rkcka(pharv,ti,tf,xi,xf,der,dt,dtmin,n)
+  !call rkcka(pharv,ti,tf,xi,xf,der,dt,dtmin,n)
   write(1,*) tf, xf(1)
 end do
 
@@ -225,7 +225,13 @@ double precision ti, tf, dt, tmax, thsi
 double precision xi(n), xf(n), dxi(n),er(n)
 double precision start, finish
 integer i
-external dpen
+interface
+  subroutine dpen(x,y,dx)
+    implicit none
+    double precision, intent(in) :: x, y(:)
+    double precision, intent(out) :: dx(:)
+  end subroutine
+end interface
 
 open(unit=1, file = 'd_pendulum.dat')
 ! initial data
@@ -251,7 +257,8 @@ CALL CPU_TIME(start)
 ! integration of ODEs
 do while(ti <= tmax)
    tf = ti + dt
-   call rkckn(dpen,ti,xi,xf,er,dt,n)
+   call rkckn(dpen,ti,xi,xf,er,dt)
+   !call rkckn(dpen,ti,xi,xf,er,dt,n)
    write(1,*) tf,xf(1),xf(2),xf(3),xf(4),l1*sin(xf(1)),-l1*cos(xf(1)),l1*sin(xf(1))+l2*sin(xf(2)),-l1*cos(xf(1))-l2*cos(xf(2))
 
 ! prepare for next step
@@ -273,11 +280,18 @@ use functions
 implicit none
 integer, parameter :: n = 4
 double precision, parameter :: rad = 3.1415926/180.0
-double precision ti, tf, dt, dtmin, der, tmax, thsi
-double precision xi(n), xf(n), dxi(n)
+double precision ti, tf, dt, dtmin, der, tmax, thsi, t
+double precision x(n)
 double precision start, finish
 integer i
-external dpen
+interface
+  subroutine dpen(x,y,dx)
+    implicit none
+    double precision, intent(in) :: x, y(:)
+    double precision, intent(out) :: dx(:)
+  end subroutine
+end interface
+double precision, dimension(size(x)) :: xi, xf, dxi, dx
 
 open(unit=1, file = 'd_pendulum_adapt.dat')
 ! initial data
@@ -300,28 +314,29 @@ xi(3)  = ms*l1*l1*dxi(1) + m2*l1*l2*dxi(2)*cos(thsi)
 xi(4)  = m2*l2*l2*dxi(2) + m2*l1*l2*dxi(1)*cos(thsi)
 ! print initial conditions
 write(1,*) ti,xi(1),xi(2),xi(3),xi(4),l1*sin(xi(1)),-l1*cos(xi(1)),l1*sin(xi(1))+l2*sin(xi(2)),-l1*cos(xi(1))-l2*cos(xi(2))
+t = ti
+x(:) = xi(:)
 CALL CPU_TIME(start)
 ! integration of ODEs
-do while(ti <= tmax)
-  call rkcka(dpen,ti,tf,xi,xf,der,dt,dtmin,n)
-  write(1,*) tf,xf(1),xf(2),xf(3),xf(4),l1*sin(xf(1)),-l1*cos(xf(1)),l1*sin(xf(1))+l2*sin(xf(2)),-l1*cos(xf(1))-l2*cos(xf(2))
+do while(t <= tmax)
+  call rkcka(dpen,t,x,der,dt,dtmin)
+  !call rkcka(dpen,ti,tf,xi,xf,der,dt,dtmin,n)
+  write(1,*) t,x(1),x(2),x(3),x(4),l1*sin(x(1)),-l1*cos(x(1)),l1*sin(x(1))+l2*sin(x(2)),-l1*cos(x(1))-l2*cos(x(2))
 end do
-100 format(5x,'t',11x,'x',11x,'y',11x,'dx/dt',7x,'dy/dt')
-102 format(5(1pe12.3))
 CALL CPU_TIME(finish)
 print '("Time = ",f6.3," seconds.")',finish-start
-print*,
 end subroutine double_pendulum_adapt
 
-subroutine dpen(t,x,dx,n)
+subroutine dpen(t,x,dx)
 ! x(1) = theta1    dx(1) = theta1'
 ! x(2) = theta2    dx(2) = theta2'
 ! x(3) = p1        dx(3) = p1'
 ! x(4) = p2        dx(4) = p2'
 use dpend
 implicit none
-integer n
-double precision t, x(n), dx(n), ths, den, c1, c2
+double precision t, ths, den, c1, c2
+double precision, intent(inout) :: x(:)
+double precision, intent(out):: dx(:)
 double precision, parameter :: g = 9.81
 ths   = x(1) - x(2)
 den   = m1 + m2*sin(ths)*sin(ths)
