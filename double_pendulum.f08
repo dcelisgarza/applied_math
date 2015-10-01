@@ -1,5 +1,6 @@
 module d_pend
-  double precision :: l1, l2, m1, m2, ms
+  integer, parameter :: dp2 = kind(1.0d0)
+  real(dp2) :: l1, l2, m1, m2, ms
 end module d_pend
 
 program main
@@ -14,32 +15,33 @@ subroutine d_pend_stat
   use ode_int
   implicit none
   integer, parameter :: n = 4
-  double precision, parameter :: rad = atan(1.)/45.
-  double precision t, dt, tmax, dtheta
-  double precision yi(n)
-  double precision, dimension(size(yi)) :: yf, dydt, er
-  double precision start, finish
+  real(dp), parameter :: rad = atan(1._dp)/45._dp
+  real(dp) :: t, dt, tmax, dtheta
+  real(dp) :: yi(n)
+  real(dp), dimension(size(yi)) :: yf, dydt, er
+  real(dp) :: start, finish
   interface
     subroutine d_pend_deriv(t,y,dydt)
       implicit none
-      double precision, intent(in) :: t, y(:)
-      double precision, intent(out) :: dydt(:)
+      integer, parameter :: dp = kind(1.0d0)
+      real(dp), intent(in) :: t, y(:)
+      real(dp), intent(out) :: dydt(:)
     end subroutine d_pend_deriv
   end interface
 
   open(unit=1, file = 'd_pend_stat.plt')
   ! Initial conditions.
-  t = 0.
-  tmax = 50.
-  dt = 5.e-3
-  l1     = 5.
-  l2     = 9.
-  m1     = 13.
-  m2     = 50.
-  yi(1)  = 173.*rad
-  yi(2)  = -86.*rad
-  dydt(1) = -3.*rad
-  dydt(2) = 35.*rad
+  t = 0._dp
+  tmax = 50._dp
+  dt = 5.d-3
+  l1     = 5._dp
+  l2     = 9._dp
+  m1     = 13._dp
+  m2     = 50._dp
+  yi(1)  = 173._dp*rad
+  yi(2)  = -86._dp*rad
+  dydt(1) = -3._dp*rad
+  dydt(2) = 35._dp*rad
   ms     = m1 + m2
   dtheta   = yi(1) - yi(2)
   yi(3)  = ms*l1*l1*dydt(1) + m2*l1*l2*dydt(2)*cos(dtheta)
@@ -65,34 +67,35 @@ subroutine d_pend_adapt
   use ode_int
   implicit none
   integer, parameter :: n = 4
-  double precision, parameter :: rad = atan(1.)/45.
-  double precision t, dt, dtmin, tmax, dtheta, der
-  double precision y(n)
-  double precision, dimension(size(y)) :: dydt, er
-  double precision start, finish
+  real(dp), parameter :: rad = atan(1.)/45.
+  real(dp) t, dt, dtmin, tmax, dtheta, der
+  real(dp) y(n)
+  real(dp), dimension(size(y)) :: dydt, er
+  real(dp) start, finish
   interface
     subroutine d_pend_deriv(t,y,dydt)
       implicit none
-      double precision, intent(in) :: t, y(:)
-      double precision, intent(out) :: dydt(:)
+      integer, parameter :: dp = kind(1.0d0)
+      real(dp), intent(in) :: t, y(:)
+      real(dp), intent(out) :: dydt(:)
     end subroutine
   end interface
 
   open(unit=1, file = 'd_pend_adapt.plt')
   ! Initial conditions.
-  t = 0.
-  tmax = 50.
-  dt     = 5.e-3
-  dtmin  = 4.375e-3
-  der    = 1.3125e-7
-  l1     = 5.
-  l2     = 9.
-  m1     = 13.
-  m2     = 50.
-  y(1)  = 173.*rad
-  y(2)  = -86.*rad
-  dydt(1) = -3.*rad
-  dydt(2) = 35.*rad
+  t = 0._dp
+  tmax = 50._dp
+  dt     = 5.d-3
+  dtmin  = 4.375d-3
+  der    = 1.3125d-7
+  l1     = 5._dp
+  l2     = 9._dp
+  m1     = 13._dp
+  m2     = 50._dp
+  y(1)  = 173._dp*rad
+  y(2)  = -86._dp*rad
+  dydt(1) = -3._dp*rad
+  dydt(2) = 35._dp*rad
   ms     = m1 + m2
   dtheta   = y(1) - y(2)
   y(3)  = ms*l1*l1*dydt(1) + m2*l1*l2*dydt(2)*cos(dtheta)
@@ -117,10 +120,10 @@ subroutine d_pend_deriv(t,y,dydt)
 ! y(4) = p2        dydt(4) = p2'
 use d_pend
 implicit none
-double precision  dtheta, den, c1, c2
-double precision, intent(in) :: t, y(:)
-double precision, intent(out):: dydt(:)
-double precision, parameter :: g = 9.81
+real(dp2) :: dtheta, den, c1, c2
+real(dp2), intent(in) :: t, y(:)
+real(dp2), intent(out):: dydt(:)
+real(dp2), parameter :: g = 9.81_dp2
 dtheta   = y(1) - y(2)
 den   = m1 + m2*sin(dtheta)*sin(dtheta)
 c1    = (y(3)*y(4)*sin(dtheta))/(l1*l2*den)

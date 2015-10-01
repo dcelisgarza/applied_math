@@ -1,5 +1,6 @@
 module ode_int
   implicit none
+  integer, parameter :: dp = kind(1.0d0)
   contains
   subroutine rk4g(derivs,x,yi,yf,h)
     !================================================================!
@@ -19,20 +20,21 @@ module ode_int
     ! j           = counter variable                                 !
     !================================================================!
     implicit none
-    double precision, intent(in) :: x, h, yi(:)
-    double precision, intent(out) :: yf(:)
-    double precision, dimension(size(yi)) :: k1, k2, k3, k4, ys
-    double precision h2,c1,c2,c3,c4,c5,c6,c7
-    parameter (c1=sqrt(2.0),c2=-0.5*c1,c3=2.0-c1,c4=2.0+c1,c5=c2-0.5,c6=0.5*c3,c7=0.5*c4)
+    real(dp), intent(in) :: x, h, yi(:)
+    real(dp), intent(out) :: yf(:)
+    real(dp), dimension(size(yi)) :: k1, k2, k3, k4, ys
+    real(dp) h2,c1,c2,c3,c4,c5,c6,c7
+    parameter (c1=sqrt(2.0_dp),c2=-0.5_dp*c1,c3=2.0_dp-c1,c4=2.0_dp+c1,c5=c2-0.5_dp,c6=0.5_dp*c3,c7=0.5_dp*c4)
     interface
       subroutine derivs(x,y,dydx)
         implicit none
-        double precision, intent(in) :: x, y(:)
-        double precision, intent(out) :: dydx(:)
+        integer, parameter :: dp = kind(1.0d0)
+        real(dp), intent(in) :: x, y(:)
+        real(dp), intent(out) :: dydx(:)
       end subroutine
     end interface
 
-    h2=0.5*h
+    h2=0.5_dp*h
     ! Calculate k1
     call derivs(x, yi, k1) ! Call the derivatives
     ys = yi + h2*k1      ! Go through all equations and prepare for the next stage.
@@ -47,7 +49,7 @@ module ode_int
 
     ! Calculate k4 and yf
     call derivs(x+h, ys, k4)
-    yf  = yi + h*(k1 + c3*k2 + c4*k3 + k4)/6.0
+    yf  = yi + h*(k1 + c3*k2 + c4*k3 + k4)/6.0_dp
   end subroutine rk4g
 
   subroutine rkck(derivs,x,yi,yf,er,h)
@@ -72,25 +74,27 @@ module ode_int
     ! j           = counter variable                                 !
     !================================================================!
     implicit none
-    double precision, intent(in) :: x, yi(:), h
-    double precision, intent(out) :: yf(:), er(:)
-    double precision, dimension(size(yi)) :: k1, k2, k3, k4, k5, k6, ys
-    double precision c2,c3,c4,c5,c6,a21,a31,a32,a41,a42,a43,&
+    real(dp), intent(in) :: x, yi(:), h
+    real(dp), intent(out) :: yf(:), er(:)
+    real(dp), dimension(size(yi)) :: k1, k2, k3, k4, k5, k6, ys
+    real(dp) c2,c3,c4,c5,c6,a21,a31,a32,a41,a42,a43,&
                      a51,a52,a53,a54,a61,a62,a63,a64,a65,b1,b3,b4,b6,&
                      db1,db3,db4,db5,db6
-    parameter ( c2=.2, c3=.3, c4=.6, c5=1., c6=.875, &
-                a21=.2, &
-                a31=.075, a32=.225, &
-                a41=.3, a42=-.9, a43=1.2, &
-                a51=-11./54., a52=2.5, a53=-70./27., a54=35./27., &
-                a61=1631./55296., a62=175./512., a63=575./13824., a64=44275./110592., a65=253./4096., &
-                b1=37./378., b3=250./621., b4=125./594., b6=512./1771., &
-                db1=b1-2825./27648., db3=b3-18575./48384., db4=b4-13525./55296., db5=-277./14336., db6=b6-0.25 )
+    parameter ( c2=.2_dp, c3=.3_dp, c4=.6_dp, c5=1._dp, c6=.875_dp, &
+                a21=.2_dp, &
+                a31=.075_dp, a32=.225_dp, &
+                a41=.3_dp, a42=-.9_dp, a43=1.2_dp, &
+                a51=-11._dp/54._dp, a52=2.5_dp, a53=-70._dp/27._dp, a54=35._dp/27._dp, &
+                a61=1631._dp/55296._dp, a62=175._dp/512._dp, a63=575._dp/13824._dp, a64=44275./110592._dp, a65=253./4096._dp, &
+                b1=37._dp/378._dp, b3=250._dp/621._dp, b4=125._dp/594._dp, b6=512._dp/1771._dp, &
+                db1=b1-2825._dp/27648._dp, db3=b3-18575._dp/48384._dp, &
+                db4=b4-13525._dp/55296._dp, db5=-277._dp/14336._dp, db6 = b6 - 0.25_dp )
     interface
       subroutine derivs(x,y,dydx)
         implicit none
-        double precision, intent(in) :: x, y(:)
-        double precision, intent(out) :: dydx(:)
+        integer, parameter :: dp = kind(1.0d0)
+        real(dp), intent(in) :: x, y(:)
+        real(dp), intent(out) :: dydx(:)
       end subroutine
     end interface
 
@@ -138,16 +142,17 @@ module ode_int
     ! j           = counter variable                                 !
     !================================================================!
     implicit none
-    double precision, intent(inout) :: x, y(:), h
-    double precision, intent(in) :: der, hmin
-    double precision, dimension(size(y)) :: yn, yscal, dydx, er
-    double precision local_der, ht, hn, maxer, tiny, s, shrink, grow, ercor
-    parameter (tiny=1e-30,s=0.9,shrink=-0.25,grow=-0.2,ercor=1.89e-4)
+    real(dp), intent(inout) :: x, y(:), h
+    real(dp), intent(in) :: der, hmin
+    real(dp), dimension(size(y)) :: yn, yscal, dydx, er
+    real(dp) local_der, ht, hn, maxer, tiny, s, shrink, grow, ercor
+    parameter (tiny=1e-30_dp,s=0.9_dp,shrink=-0.25_dp,grow=-0.2_dp,ercor=1.89d-4)
     interface
       subroutine derivs(x,y,dydx)
         implicit none
-        double precision, intent(in) :: x, y(:)
-        double precision, intent(out) :: dydx(:)
+        integer, parameter :: dp = kind(1.0d0)
+        real(dp), intent(in) :: x, y(:)
+        real(dp), intent(out) :: dydx(:)
       end subroutine
     end interface
 
@@ -159,9 +164,9 @@ module ode_int
     do
       call rkck(derivs,x,y,yn,er,h)
       maxer = maxval(abs(er(:)/yscal(:)))/local_der
-      if (maxer <= 1.) exit
+      if (maxer <= 1._dp) exit
       ht = s*h*maxer**shrink
-      h = sign(max(abs(ht),0.1*abs(h)),h) ! Prevents jumps of more than an order of magnitude.
+      h = sign(max(abs(ht),0.1_dp*abs(h)),h) ! Prevents jumps of more than an order of magnitude.
       if (abs(h)<hmin .or. x+h == x) then
         ! This means that the error is so strict h is effectively zero,
         ! so the program enters an infinite loop.
@@ -176,7 +181,7 @@ module ode_int
     if (maxer > ercor) then
       hn = s*h*maxer**grow
     else
-      hn = 5.*h
+      hn = 5._dp*h
     end if
 
     if(abs(hn) < abs(hmin)) hn = hmin
