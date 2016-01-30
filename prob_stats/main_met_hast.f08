@@ -4,23 +4,22 @@ program main
 
   implicit none
   integer  :: i, ac, nbr_samples   ! i = counter, ac = autocorrelation, number of samples.
-  real(dp) :: rnd_uni, rnd_exp     ! rnd = random variable, _uni = uniform, _exp = exponential.
-  real(dp) :: sample, accept       ! sample = sample, accept = acceptance criterion.
+  real(dp) :: accept               ! accept = acceptance criterion.
   real(dp) :: direction, distance
   real(dp) :: current_sample(2)    ! current sample, could or could not be rejected.
   real(dp) :: r(2), x(2), y(2)     ! values of r, x and y.
 
-  double precision :: ZBQLUAB, ZBQLEXP, ZBQLU01
+  real(dp) :: ZBQLUAB, ZBQLEXP, ZBQLU01
   external ZBQLINI, ZBQLUAB, ZBQLEXP, ZBQLU01
 
   call ZBQLINI(0)
 
-  current_sample = 1d-8
+  current_sample = 0.!1d-8
 
   i  = 0
   ac = 5
   nbr_samples = 1e6
-  open(unit = 1, file = 'test.dat')
+  open(unit = 1, file = 'data.dat')
 
   collect_samples: do while (i < ac * nbr_samples)
     ! Direction and distance.
@@ -50,7 +49,7 @@ program main
   end do collect_samples
   close (1, status='keep')
 
-  call system( "gnuplot plot.plt" )
+  call system( "gnuplot plot_met_hast.plt" )
   !call system( "" )
 
 end program main
