@@ -15,7 +15,7 @@
 *       NAG generator.
 *
       COMMON /ZBQL0001/ ZBQLIX,B,C
-      DOUBLE PRECISION ZBQLIX(43),B,C
+      real(kind(1.0d0)) ZBQLIX(43),B,C
       INTEGER I
       DATA (ZBQLIX(I),I=1,43) /8.001441D7,5.5321801D8,
      +1.69570999D8,2.88589940D8,2.91581871D8,1.03842493D8,
@@ -38,7 +38,7 @@
       SUBROUTINE ZBQLINI(SEED)
 ******************************************************************
 *       To initialize the random number generator - either
-*       repeatably or nonrepeatably. Need double precision
+*       repeatably or nonrepeatably. Need real(kind(1.0d0))
 *       variables because integer storage can't handle the
 *       numbers involved
 ******************************************************************
@@ -76,8 +76,8 @@
 *
       INTEGER SEED,SS,MM,HH,DD,FILNO,I
       INTEGER INIT
-      DOUBLE PRECISION ZBQLIX(43),B,C
-      DOUBLE PRECISION TMPVAR1,DSS,DMM,DHH,DDD
+      real(kind(1.0d0)) ZBQLIX(43),B,C
+      real(kind(1.0d0)) TMPVAR1,DSS,DMM,DHH,DDD
 
       COMMON /ZBQL0001/ ZBQLIX,B,C
       SAVE INIT
@@ -125,7 +125,7 @@
         RETURN
        ENDIF
        GOTO 10
- 12    READ(FILNO,'(3(I2),I3)') SS,MM,HH,DD
+12    READ(FILNO,'(3(I2),I3)') SS,MM,HH,DD
        CLOSE(FILNO)
        CALL SYSTEM('rm zbql1234.tmp')
        DSS = DINT((DBLE(SS)/6.0D1) * B)
@@ -162,7 +162,7 @@
 *
 *       Returns a uniform random number between 0 & 1, using
 *       a Marsaglia-Zaman type subtract-with-borrow generator.
-*       Uses double precision, rather than integer, arithmetic
+*       Uses real(kind(1.0d0)), rather than integer, arithmetic
 *       throughout because MZ's integer constants overflow
 *       32-bit integer storage (which goes from -2^31 to 2^31).
 *       Ideally, we would explicitly truncate all integer
@@ -170,13 +170,13 @@
 *       precision representations do not accumulate approximation
 *       error; however, on some machines the use of DNINT to
 *       accomplish this is *seriously* slow (run-time increased
-*       by a factor of about 3). This double precision version
+*       by a factor of about 3). This real(kind(1.0d0)) version
 *       has been tested against an integer implementation that
 *       uses long integers (non-standard and, again, slow) -
 *       the output was identical up to the 16th decimal place
 *       after 10^10 calls, so we're probably OK ...
 *
-      DOUBLE PRECISION ZBQLU01,DUMMY,B,C,ZBQLIX(43),X,B2,BINV
+      real(kind(1.0d0)) ZBQLU01,DUMMY,B,C,ZBQLIX(43),X,B2,BINV
       INTEGER CURPOS,ID22,ID43
 
       COMMON /ZBQL0001/ ZBQLIX,B,C
@@ -229,7 +229,7 @@
 *
 *       Returns a random number uniformly distributed on (A,B)
 *
-      DOUBLE PRECISION A,B,ZBQLU01,ZBQLUAB
+      real(kind(1.0d0)) A,B,ZBQLU01,ZBQLUAB
 
 *
 *       Even if A > B, this will work as B-A will then be -ve
@@ -249,7 +249,7 @@
 *       Returns a random number exponentially distributed with
 *       mean MU
 *
-      DOUBLE PRECISION MU,ZBQLEXP,ZBQLU01
+      real(kind(1.0d0)) MU,ZBQLEXP,ZBQLU01
 
       ZBQLEXP = 0.0D0
 
@@ -271,8 +271,8 @@
 *       MU and standard deviation |SIGMA|, using the Box-Muller
 *       algorithm
 *
-      DOUBLE PRECISION THETA,R,ZBQLNOR,ZBQLU01,PI,MU,SIGMA
-      DOUBLE PRECISION SPARE
+      real(kind(1.0d0)) THETA,R,ZBQLNOR,ZBQLU01,PI,MU,SIGMA
+      real(kind(1.0d0)) SPARE
       INTEGER STATUS
       SAVE STATUS,SPARE,PI
       DATA STATUS /-1/
@@ -298,8 +298,8 @@
 *
 *       Returns a random number binomially distributed (N,P)
 *
-      DOUBLE PRECISION P,ZBQLBET1
-      DOUBLE PRECISION PP,PPP,G,Y,TINY
+      real(kind(1.0d0)) P,ZBQLBET1
+      real(kind(1.0d0)) PP,PPP,G,Y,TINY
       INTEGER N,ZBQLBIN,ZBQLGEO,IZ,NN
 
       TINY = 1.0D-8
@@ -381,7 +381,7 @@
 *       parameter P ie. mean 1/P
 *
 
-      DOUBLE PRECISION P,ZBQLU01,U,TINY
+      real(kind(1.0d0)) P,ZBQLU01,U,TINY
       INTEGER ZBQLGEO
 
       TINY = 1.0D-12
@@ -418,8 +418,8 @@
 *       Returns a random number Poisson distributed with mean MU
 *
 
-      DOUBLE PRECISION ZBQLU01,X,Y,MU,PI
-      DOUBLE PRECISION ZBQLLG,ZBQLGAM,MU1,TMP1,TMP2,T
+      real(kind(1.0d0)) ZBQLU01,X,Y,MU,PI
+      real(kind(1.0d0)) ZBQLLG,ZBQLGAM,MU1,TMP1,TMP2,T
       INTEGER ZBQLPOI,ZBQLBIN,K,INIT
       SAVE INIT,PI
       DATA INIT /0/
@@ -500,9 +500,9 @@
 *       G/H and variance G/(H^2). (ie. shape parameter G & scale
 *       parameter H)
 *
-      DOUBLE PRECISION C,D,R,ZBQLGAM,ZBQLU01,G,H,A,z1,z2,B1,B2,M
-      DOUBLE PRECISION U1,U2,U,V,TEST,X
-      double precision c1,c2,c3,c4,c5,w
+      real(kind(1.0d0)) C,D,R,ZBQLGAM,ZBQLU01,G,H,A,z1,z2,B1,B2,M
+      real(kind(1.0d0)) U1,U2,U,V,TEST,X
+      real(kind(1.0d0)) c1,c2,c3,c4,c5,w
 
       ZBQLGAM = 0.0D0
 
@@ -582,7 +582,7 @@
 *       Returns a random number, beta distributed with degrees
 *       of freedom NU1 and NU2.
 *
-      DOUBLE PRECISION NU1,NU2,ZBQLGAM,ZBQLBET1,ZBQLU01,X1,X2
+      real(kind(1.0d0)) NU1,NU2,ZBQLGAM,ZBQLBET1,ZBQLU01,X1,X2
 
       ZBQLBET1 = 0.0D0
 
@@ -593,7 +593,7 @@
 *
 *       If parameters are too small, gamma subroutine tends to return zero
 *       as all the probability goes to the origin and we get rounding
-*       errors, even with double precision. In this case, we use Johnk's
+*       errors, even with real(kind(1.0d0)). In this case, we use Johnk's
 *       method, suitably scaled to avoid rounding errors as much as possible.
 *
 
@@ -624,7 +624,7 @@
 *       A and location parameter B, i.e. density is
 *	f(x) = ( A/(B**A) ) * x**(A-1) * EXP( -(x/B)**A )
 *
-      DOUBLE PRECISION A,B,ZBQLU01,ZBQLWEI,U
+      real(kind(1.0d0)) A,B,ZBQLU01,ZBQLWEI,U
 
       ZBQLWEI = 0.0D0
 
@@ -649,7 +649,7 @@
 *       form of the distribution is *not* the no. of trials to
 *       the Rth success - see documentation for full spec.
 *
-      DOUBLE PRECISION R,P,ZBQLGAM,Y
+      real(kind(1.0d0)) R,P,ZBQLGAM,Y
       INTEGER ZBQLNB,ZBQLPOI
 
       ZBQLNB = 0
@@ -675,7 +675,7 @@
 *     randgen.txt). The algorithm is straightforward - it uses the
 *     inverse CDF method.
 *
-      DOUBLE PRECISION A,B,ZBQLPAR,ZBQLU01,U
+      real(kind(1.0d0)) A,B,ZBQLPAR,ZBQLU01,U
 
       ZBQLPAR = 0.0D0
 
@@ -698,7 +698,7 @@
 *     that given in Press et al (1992), Section 6.1, although this
 *     version also allows for arguments less than 1.
 *
-      DOUBLE PRECISION X,Z,Z2,ZBQLLG,PI,RLN2P,C(0:6),TMP,SUM
+      real(kind(1.0d0)) X,Z,Z2,ZBQLLG,PI,RLN2P,C(0:6),TMP,SUM
       INTEGER INIT,I
       SAVE INIT,C,RLN2P,PI
       DATA INIT /0/
