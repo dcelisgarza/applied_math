@@ -7,10 +7,10 @@ contains
 
     implicit none
     interface n_dim_distribution
-      function dist(coords,aux)
+      function dist(x,aux)
         use numbers
         implicit none
-        real(dp), intent(in), optional :: coords(:)
+        real(dp), intent(in), optional :: x(:)
         real(dp), intent(in), optional :: aux(:)
         real(dp)                       :: dist
       end function dist
