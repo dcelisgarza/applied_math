@@ -1,0 +1,24 @@
+# Defining variables.
+target = find_roots.out
+objects = numbers.o cont_func.o find_roots.o find_roots_main.o
+f08comp = gfortran
+FCFLAGS = -g
+#FCFLAGS = -O2 -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
+# Makefile
+default: $(target)
+$(target): $(objects)
+	$(f08comp) $(objects) $(FCFLAGS) -o $@
+numbers.o: ../numbers.f08
+	$(f08comp) $(FCFLAGS) -c ../numbers.f08
+cont_func.o: cont_func.f08
+	$(f08comp) $(FCFLAGS) -c cont_func.f08
+find_roots.o: find_roots.f08
+	$(f08comp) $(FCFLAGS) -c find_roots.f08
+find_roots_main.o: find_roots_main.f08
+	$(f08comp) $(FCFLAGS) -c find_roots_main.f08
+# Cleaning everything
+clean:
+	rm -f *.o *.mod
+clobber: clean
+	rm -f $(target)
+.PHONY: default clean cobbler
