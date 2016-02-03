@@ -1,7 +1,7 @@
 module ode_int
+  use numbers
   implicit none
-  integer, parameter :: dp = kind(1.0d0)
-  contains
+contains
   subroutine rk4g(derivs,x,yi,yf,h)
     !================================================================!
     ! Solve n first-order ODEs or n/2 second-order.                  !
@@ -20,19 +20,19 @@ module ode_int
     ! j           = counter variable                                 !
     !================================================================!
     implicit none
-    real(dp), intent(in) :: x, h, yi(:)
-    real(dp), intent(out) :: yf(:)
+    real(dp), intent(in)          :: x, h, yi(:)
+    real(dp), intent(out)         :: yf(:)
     real(dp), dimension(size(yi)) :: k1, k2, k3, k4, ys
     real(dp) h2,c1,c2,c3,c4,c5,c6,c7
     parameter (c1=sqrt(2.0_dp),c2=-0.5_dp*c1,c3=2.0_dp-c1,c4=2.0_dp+c1,c5=c2-0.5_dp,c6=0.5_dp*c3,c7=0.5_dp*c4)
-    interface
+    interface derivatives
       subroutine derivs(x,y,dydx)
+        use numbers
         implicit none
-        integer, parameter :: dp = kind(1.0d0)
-        real(dp), intent(in) :: x, y(:)
+        real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)
-      end subroutine
-    end interface
+      end subroutine derivs
+    end interface derivatives
 
     h2=0.5_dp*h
     ! Calculate k1
@@ -74,29 +74,29 @@ module ode_int
     ! j           = counter variable                                 !
     !================================================================!
     implicit none
-    real(dp), intent(in) :: x, yi(:), h
-    real(dp), intent(out) :: yf(:), er(:)
+    real(dp), intent(in)          :: x, yi(:), h
+    real(dp), intent(out)         :: yf(:), er(:)
     real(dp), dimension(size(yi)) :: k1, k2, k3, k4, k5, k6, ys
     real(dp) c2,c3,c4,c5,c6,a21,a31,a32,a41,a42,a43,&
-                     a51,a52,a53,a54,a61,a62,a63,a64,a65,b1,b3,b4,b6,&
-                     db1,db3,db4,db5,db6
+    a51,a52,a53,a54,a61,a62,a63,a64,a65,b1,b3,b4,b6,&
+    db1,db3,db4,db5,db6
     parameter ( c2=.2_dp, c3=.3_dp, c4=.6_dp, c5=1._dp, c6=.875_dp, &
-                a21=.2_dp, &
-                a31=.075_dp, a32=.225_dp, &
-                a41=.3_dp, a42=-.9_dp, a43=1.2_dp, &
-                a51=-11._dp/54._dp, a52=2.5_dp, a53=-70._dp/27._dp, a54=35._dp/27._dp, &
-                a61=1631._dp/55296._dp, a62=175._dp/512._dp, a63=575._dp/13824._dp, a64=44275./110592._dp, a65=253./4096._dp, &
-                b1=37._dp/378._dp, b3=250._dp/621._dp, b4=125._dp/594._dp, b6=512._dp/1771._dp, &
-                db1=b1-2825._dp/27648._dp, db3=b3-18575._dp/48384._dp, &
-                db4=b4-13525._dp/55296._dp, db5=-277._dp/14336._dp, db6 = b6 - 0.25_dp )
-    interface
+    a21=.2_dp, &
+    a31=.075_dp, a32=.225_dp, &
+    a41=.3_dp, a42=-.9_dp, a43=1.2_dp, &
+    a51=-11._dp/54._dp, a52=2.5_dp, a53=-70._dp/27._dp, a54=35._dp/27._dp, &
+    a61=1631._dp/55296._dp, a62=175._dp/512._dp, a63=575._dp/13824._dp, a64=44275./110592._dp, a65=253./4096._dp, &
+    b1=37._dp/378._dp, b3=250._dp/621._dp, b4=125._dp/594._dp, b6=512._dp/1771._dp, &
+    db1=b1-2825._dp/27648._dp, db3=b3-18575._dp/48384._dp, &
+    db4=b4-13525._dp/55296._dp, db5=-277._dp/14336._dp, db6 = b6 - 0.25_dp )
+    interface derivatives
       subroutine derivs(x,y,dydx)
+        use numbers
         implicit none
-        integer, parameter :: dp = kind(1.0d0)
-        real(dp), intent(in) :: x, y(:)
+        real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)
-      end subroutine
-    end interface
+      end subroutine derivs
+    end interface derivatives
 
     ! Calculate k1
     call derivs(x, yi, k1)
@@ -142,19 +142,19 @@ module ode_int
     ! j           = counter variable                                 !
     !================================================================!
     implicit none
-    real(dp), intent(inout) :: x, y(:), h
-    real(dp), intent(in) :: der, hmin
+    real(dp), intent(inout)      :: x, y(:), h
+    real(dp), intent(in)         :: der, hmin
     real(dp), dimension(size(y)) :: yn, yscal, dydx, er
     real(dp) local_der, ht, hn, maxer, tiny, s, shrink, grow, ercor
     parameter (tiny=1e-30_dp,s=0.9_dp,shrink=-0.25_dp,grow=-0.2_dp,ercor=1.89d-4)
-    interface
+    interface derivatives
       subroutine derivs(x,y,dydx)
+        use numbers
         implicit none
-        integer, parameter :: dp = kind(1.0d0)
-        real(dp), intent(in) :: x, y(:)
+        real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)
-      end subroutine
-    end interface
+      end subroutine derivs
+    end interface derivatives
 
     local_der = der
     call derivs(x, y, dydx)
@@ -181,7 +181,7 @@ module ode_int
     if (maxer > ercor) then
       hn = s*h*maxer**grow
     else
-      hn = 5._dp*h
+      hn = 5.*h
     end if
 
     if(abs(hn) < abs(hmin)) hn = hmin
@@ -191,4 +191,68 @@ module ode_int
     h  = hn      ! Setting the next step length.
     y(:) = yn(:) ! Setting all the dependent variables to their new starting points.
   end subroutine rkcka
+
+  subroutine basic_verlet(derivs,x,yi,yf,h)
+    !================================================================!
+    ! Basic Verlet Integrator                                        !
+    ! Daniel Celis Garza 2nd Feb. 2016                               !
+    ! This works best with constant acceleration.                    !
+    !----------------------------------------------------------------!
+    implicit none
+    real(dp), intent(in)          :: x, h
+    real(dp), intent(inout)       :: yi(:), yf(:)
+    real(dp), dimension(size(yi)) :: dydx, ys
+    real(dp)                      :: h2
+    interface derivatives
+      subroutine derivs(x,y,dydx)
+        use numbers
+        implicit none
+        real(dp), intent(in)  :: x, y(:)
+        real(dp), intent(out) :: dydx(:)
+      end subroutine derivs
+    end interface derivatives
+
+    ! Calculate h^2.
+    h2 = h*h
+    ! Save current values of y.
+    ys = yf
+    call derivs(x,yf,dydx)
+    ! Calculate the next step.
+    yf = 2.*yf - yi + dydx*h2
+    yi = ys
+  end subroutine basic_verlet
+
+  subroutine velocity_verlet(derivs,x,yi,yf,h)
+    implicit none
+    real(dp), intent(in)            :: x, h
+    real(dp), intent(in)            :: yi(:)
+    real(dp), intent(out)           :: yf(:)
+    integer                         :: n_coords, n_derivs
+    real(dp), dimension(size(yi)/2) :: dydx, dydxs
+    real(dp)                        :: h2
+    interface derivatives
+      subroutine derivs(x,y,dydx)
+        use numbers
+        implicit none
+        real(dp), intent(in)  :: x, y(:)
+        real(dp), intent(out) :: dydx(:)
+      end subroutine derivs
+    end interface derivatives
+
+    n_coords = size(yi)/2
+    n_derivs = size(yi)
+    h2 = h*h
+    ! Calculating acceleration.
+    call derivs(x,yi,dydx)
+    ! Save the acceleration for the current step.
+    dydxs = dydx
+    ! Calculating x(t+dt)
+    ! x(t+dt) = x(t) + v(t)*dt + 0.5*a(t)*dt^2
+    yf(1:n_coords) = yi(1:n_coords) + yi(n_coords+1:n_derivs)*h + 0.5*dydx*h2
+    ! Calculating a(t+dt) from -\nabla V(x(t+dt)) = F = m*a.
+    call derivs(x,yf,dydx)
+    ! Calculating v(t+dt)
+    ! v(t+dt) = v(t) + 0.5*(a(t) + a(t+dt))*dt
+    yf(n_coords+1:n_derivs) = yi(n_coords+1:n_derivs) + 0.5*(dydxs + dydx)*h
+  end subroutine velocity_verlet
 end module ode_int

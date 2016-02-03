@@ -23,7 +23,6 @@ subroutine d_pend_stat
   interface
     subroutine d_pend_deriv(t,y,dydt)
       implicit none
-      integer, parameter :: dp = kind(1.0d0)
       real(dp), intent(in) :: t, y(:)
       real(dp), intent(out) :: dydt(:)
     end subroutine d_pend_deriv
@@ -75,7 +74,6 @@ subroutine d_pend_adapt
   interface
     subroutine d_pend_deriv(t,y,dydt)
       implicit none
-      integer, parameter :: dp = kind(1.0d0)
       real(dp), intent(in) :: t, y(:)
       real(dp), intent(out) :: dydt(:)
     end subroutine
