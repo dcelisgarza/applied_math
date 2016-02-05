@@ -1,0 +1,59 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[latin1]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{lmodern}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\author{Daniel Celis Garza}
+\title{Interpolation Notes}
+\date{\today}
+\begin{document}
+\maketitle
+\section{Neville's Algorithm}
+For $n = 4$
+\begin{align*}
+x_{1}:\qquad& y_{1} =& P_{1,1} 	&					\hspace{-2cm}&				   \\
+			&		 & 	& P_{1,2}			\hspace{-2cm}&				   \\
+x_{2}:\qquad& y_{2} =& P_{2,2} 	&\qquad P_{1,2,3}	\hspace{-2cm}&				   \\
+			&		 &		 	& P_{2,3}			\hspace{-2cm}& P_{1,2,3,4}	   \\
+x_{3}:\qquad& y_{3}	=& P_{3,3}	&\qquad P_{2,3,4}	\hspace{-2cm}&				   \\
+			&		 & 	& P_{3,4}			\hspace{-2cm}&				   \\
+x_{1}:\qquad& y_{4} =& P_{4,4} 	&					\hspace{-2cm}&				   \\
+\end{align*}
+
+\begin{subequations}\label{e:nev}
+\begin{align}
+& P_{i,i} = y_{i}~, && 0\le i \le n \\
+& P_{i,j} =
+\dfrac{
+(x_j-x)P_{i,j-1} + (x-x_i)P_{i+1,j}
+}
+{
+x_{j}-x_{i}
+}~, && 0\le i < j \le n
+\end{align}
+\end{subequations}
+
+The original formula is:
+
+\begin{align}\label{e:lag}
+^{n}P(x) = \sum\limits_{i=0}^{n}\left(
+\prod\limits_{\substack{0 \le j \le n \\ j \ne i}}
+\dfrac{x-x_{j}}{x_{i}-x_{j}}
+\right)y_{i}
+\end{align}
+
+For $n = 2$ \cref{e:nev} is
+\begin{align*}
+P_{1,2} &= \dfrac{(x_{2} - x)P_{1,1} + (x-x_{1})P_{2,2}}{x_{2}-x_{1}}\\
+P_{1,2} &= \dfrac{(x_{2} - x)y_{1} + (x-x_{1})y_{2}}{x_{2}-x_{1}}	 \\
+\end{align*}
+and \cref{e:lag} is
+\begin{align*}
+^{n}P &= \dfrac{x-x_{2}}{x_{1}-x_{2}}y_{1} + \dfrac{x-x_{1}}{x_{2}-x_{1}}y_{2} \\
+^{n}P &= \dfrac{-(x_{2}-x)}{-(x_{2}-x_{1})}y_{1} + \dfrac{x-x_{1}}{x_{2}-x_{1}}y_{2} \\
+\end{align*}
+\end{document}
