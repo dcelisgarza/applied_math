@@ -7,7 +7,11 @@ contains
     real(dp), intent(out)         :: y, dy
     integer                       :: i, j, idx, aux_idx(1), n
     real(dp), dimension(size(xi)) :: c, d, difx, aux_difx, den
-
+    ! Making sure we're using equally sized arrays.
+    if(size(xi) /= size(yi)) then
+      print*, ' Size of x and y arrays must be equal.'
+      return
+    endif
     ! The order of the interpolation.
     n = size(xi)
     ! Initialising relationships of Cs and Ds.
@@ -27,7 +31,7 @@ contains
     ! Looping over the columns of Neville's tree.
     nev_loop: do i = 1, n - 1
       den(1:n-i) = difx(1:n-i) - difx(1+i:n)
-      if ( any( den(1:n-i) == 0.0_dp ) ) print*, ' subr:: poly_interpol: nev_loop. Division by zero.'
+      if ( any( den(1:n-i) == 0.0_dp ) ) print*, ' Error: subr:: poly_interpol: nev_loop. Division by zero.'
       den(1:n-i) = ( c(2:n-i+1) - d(1:n-i) ) / den(1:n-i)
       d(1:n-i)   = difx(1+i:n) * den(1:n-i)
       c(1:n-i)   = difx(1:n-i) * den(1:n-i)
