@@ -1,5 +1,5 @@
 module interpolation
-  use numbers
+  use nrtype
 contains
   subroutine poly_interpol(xi,yi,x,y,dy)
     implicit none

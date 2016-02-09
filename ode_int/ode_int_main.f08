@@ -1,5 +1,5 @@
 program ode_main
-  use numbers
+  use nrtype
   use derivatives
   use ode_int
   implicit none

@@ -1,4 +1,4 @@
-module numbers
+module nrtype
   integer, parameter :: i1  = selected_int_kind(2)  ! 1-byte integer.
   integer, parameter :: i2  = selected_int_kind(4)  ! 2-byte integer.
   integer, parameter :: i4  = selected_int_kind(9)  ! 4-byte integer.
@@ -16,4 +16,4 @@ module numbers
   real(dp), parameter :: tau   = 6.283185307179586476925286766559005768394_dp
   real(dp), parameter :: sqrt2 = 1.41421356237309504880168872420969807856967_dp
   real(dp), parameter :: euler = 2.71828182845904523536028747135266249775725_dp
-end module numbers
+end module nrtype

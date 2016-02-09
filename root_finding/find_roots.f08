@@ -1,11 +1,11 @@
 module find_roots
-  use numbers
+  use nrtype
 contains
   subroutine outbracket(func,interval,success,max_it,factor)
     implicit none
     interface cont_func
       function func(x)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in)  :: x
         real(dp)              :: func
@@ -50,7 +50,7 @@ contains
     implicit none
     interface cont_func
       function func(x)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in)  :: x
         real(dp)              :: func
@@ -88,7 +88,7 @@ contains
     implicit none
     interface cont_func
       function func(x)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in) :: x
         real(dp)             :: func

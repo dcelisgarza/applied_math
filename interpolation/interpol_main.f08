@@ -1,5 +1,5 @@
 program interpol_main
-  use numbers
+  use nrtype
   use interpolation
   real(dp) :: y, dy, x
   real(dp) :: xi(6), yi(6)

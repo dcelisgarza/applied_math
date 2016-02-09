@@ -1,5 +1,5 @@
 module ode_int
-  use numbers
+  use nrtype
   implicit none
 contains
   subroutine rk4g(derivs,x,yi,yf,h)
@@ -27,7 +27,7 @@ contains
     parameter (c1=sqrt(2.0_dp),c2=-0.5_dp*c1,c3=2.0_dp-c1,c4=2.0_dp+c1,c5=c2-0.5_dp,c6=0.5_dp*c3,c7=0.5_dp*c4)
     interface derivatives
       subroutine derivs(x,y,dydx)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)
@@ -91,7 +91,7 @@ contains
     db4=b4-13525._dp/55296._dp, db5=-277._dp/14336._dp, db6 = b6 - 0.25_dp )
     interface derivatives
       subroutine derivs(x,y,dydx)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)
@@ -149,7 +149,7 @@ contains
     parameter (tiny=1e-30_dp,s=0.9_dp,shrink=-0.25_dp,grow=-0.2_dp,ercor=1.89d-4)
     interface derivatives
       subroutine derivs(x,y,dydx)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)
@@ -205,7 +205,7 @@ contains
     real(dp)                      :: h2
     interface derivatives
       subroutine derivs(x,y,dydx)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)
@@ -232,7 +232,7 @@ contains
     real(dp)                        :: h2
     interface derivatives
       subroutine derivs(x,y,dydx)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in)  :: x, y(:)
         real(dp), intent(out) :: dydx(:)

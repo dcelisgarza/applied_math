@@ -1,5 +1,5 @@
 program find_roots_main
-  use numbers
+  use nrtype
   use continuous_functions
   use find_roots
   implicit none

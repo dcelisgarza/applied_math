@@ -1,5 +1,5 @@
 module derivatives
-  use numbers
+  use nrtype
 contains
   subroutine constant_accel(x,y,dydx)
     implicit none

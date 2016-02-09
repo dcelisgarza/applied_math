@@ -1,5 +1,5 @@
 module continuous_functions
-  use numbers
+  use nrtype
 contains
   pure function polynomial(x)
     implicit none

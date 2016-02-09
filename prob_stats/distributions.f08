@@ -1,5 +1,5 @@
 module distributions
-  use numbers
+  use nrtype
 contains
   pure function radial_sine_dist(radius,angle)
     implicit none

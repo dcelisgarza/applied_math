@@ -1,5 +1,5 @@
 program main
-  use numbers
+  use nrtype
   use distributions
   use metropolis_hastings_mod
   implicit none

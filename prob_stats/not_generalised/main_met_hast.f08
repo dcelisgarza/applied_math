@@ -1,5 +1,5 @@
 program main
-  use numbers
+  use nrtype
   use distributions
 
   implicit none

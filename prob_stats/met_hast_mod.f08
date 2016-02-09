@@ -1,5 +1,5 @@
 module metropolis_hastings_mod
-  use numbers
+  use nrtype
   use distributions
 contains
 
@@ -8,7 +8,7 @@ contains
     implicit none
     interface n_dim_distribution
       function dist(x,aux)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in), optional :: x(:)
         real(dp), intent(in), optional :: aux(:)
@@ -71,7 +71,7 @@ contains
     implicit none
     interface polar_distribution
       function dist(radius,angle)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in), optional :: radius
         real(dp), intent(in), optional :: angle
@@ -139,7 +139,7 @@ contains
     implicit none
     interface polar_distribution
       function dist(radius,angle)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in), optional :: radius
         real(dp), intent(in), optional :: angle
@@ -204,7 +204,7 @@ contains
     implicit none
     interface spherical_distribution
       function dist(radius,theta,phi)
-        use numbers
+        use nrtype
         implicit none
         real(dp), intent(in), optional :: radius
         real(dp), intent(in), optional :: theta
