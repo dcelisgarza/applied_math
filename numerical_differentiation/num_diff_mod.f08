@@ -27,7 +27,7 @@ contains
     real(dp), intent(in) :: x, h ! Variable and step size.
     real(dp)             :: eicedi1
     real(dp)             :: ho8, ho8p6   ! h/8
-    real(dp), parameter  :: c4 = 1/280, c3 = 4/105, c2 = 0.2, c1 = 0.8
+    real(dp), parameter  :: c4 = 1./280, c3 = 4./105, c2 = 0.2, c1 = 0.8
     interface functn
       function func(x)
         use nrtype
@@ -48,4 +48,29 @@ contains
               +c1*func(x+ho8)&
               -c4*func(x+ho8*4._dp)+c3*func(x+ho8*3._dp)-c2*func(x+ho8*2._dp))/ho8p6
   end function eicedi1
+
+  function pdefcedi1(y,x,g)
+    ! pde := for finite elements, f := first order, ce := central, di1 := 1st derivative
+    implicit none
+    real(dp), intent(in) :: x, g ! Variable and grid size.
+    real(dp)             :: pdefcedi1
+    real(dp)             :: g2
+    real(dp), parameter  :: c1 = 2.
+    interface functn
+      function func(x)
+        use nrtype
+        real(dp), intent(in)           :: x    ! Variables
+        real(dp)                       :: func ! Function
+      end function func
+    end interface functn
+
+    g2   = g**2._dp
+
+    div0: if (g2 == 0.) then
+      write(*,*) ' Error: pdefcedi1 :: Division by zero.'
+      return
+    end if div0
+    pdefcedi1 = (func(x-g)-c1*func(x)+func(x+g))/g2
+  end function pdefcedi1
+
 end module num_diff
