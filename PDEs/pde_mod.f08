@@ -11,7 +11,7 @@ contains
       real(dp), allocatable :: a(:,:)
     end type a2d
     type(a2d), allocatable  :: rho(:)
-    real(dp), dimension(:,:), allocatable :: ui, uj
+    real(dp), dimension(:,:), allocatable :: cu, cu_1 ! cu = Coarse solution for u.
 
     ! Exit if both dimensions aren't equal. We need a square matrix.
     dimu: if(size(u,1) /= size(u,2)) then
@@ -44,7 +44,42 @@ contains
       allocate( rho(cng) % a(cn,cn) )
       rho(cng) % a = hwrsct( rho(cng+1) % p )
     end do grid
+
+    ! Assign the coarsest grid.
+    cn = 3
+    allocate(cu(cn,cn))
+    call srhselpde(rho(1) % a, cu)
+
+    ! Go through progressively finer grids.
+    fg: do j = 2, ng
+      call movealloc(cu, cu_1)
+      cn = 2*cn - 1
+      allocate(cu(cn,cn))
+      ! interpolate from a coarse grid to a finer grid.
+      cu = gridint(cu_1,cn)
+      deallocate(cu_1)
+      ! Iterate to solve the equation.
+      
+    end do fg
+
   end subroutine fepdelin
+
+  function gridint(u,n)
+    implicit none
+    real(dp), intent(in) :: u(:,:)
+    real(dp)             :: gridint(n,n)
+    integer              :: cn ! Coarse n.
+
+    cn = size(u,1)
+    dimu: if (size(u,1) /= size(u,2)) then
+      write(*,*) ' Error: subr:: gridint:: dimu. U must be a square matrix.'
+      return
+    end if dimu
+
+    gridint(1:n:2,1:n:2)   = u(1:cn,1:cn)
+    gridint(2:n-1:2,1:n:2) = 0.5_dp*(gridint(3:n:2,1:n:2) + gridint(1:n-2:2,1:n:2))
+    gridint(1:n:2,2:n-1:2) = 0.5_dp*(gridint(1:n:2,3:n:2) + gridint(1:n:2,1:n-2:2))
+  end function gridint
 
   function hwrsct(u)
     ! Function for restricting u to a coarser grid.
@@ -67,8 +102,17 @@ contains
     ! Internal elements.
     hwrsct(2:cn-1,2:cn-1) = 0.5_dp * u(3:n-2:2, 3:n-2:2) + 0.125_dp * &
                             (&
-                            u(4:n-1:2,3:n-1:2)&
+                            u(4:n-1:2,3:n-2:2) + u(2:n-3:2,3:n-2:2) + &
+                            u(3:n-2:2,4:n-1:2) + u(3:n-2:2,2:n-3:2)   &
                             )
   end function hwrsct
+
+  subroutine srhselpde(rhs, u, h)
+    implicit none
+    real(dp), intent(in)  :: rhs(:,:), h
+    real(dp), intent(out) :: u(:,:)
+    u = 0.0
+    u(2,2) = -h*h*rhs(2,2)/4._dp
+  end subroutine srhselpde
 
 end module finite_elements
