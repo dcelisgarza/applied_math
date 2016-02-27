@@ -1,7 +1,7 @@
 program solar_system_main
   use orbital_mech
   implicit none
-  real(dp) :: kep_el(20,9)
+  real(dp) :: kep_el(12,9)
   character(:), allocatable :: filename
   integer  :: i
   filename = 'kep_el.txt'

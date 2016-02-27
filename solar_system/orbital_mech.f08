@@ -34,10 +34,20 @@ contains
       stop
     endif
 
-    read_file1: do i = 1, bodies
-      read(1,*) kep_el(1:6,i)
-      read(1,*) kep_el(7:12,i)
-    end do read_file1
+    epoch: if (size(kep_el,1) == 12) then
+      read_file1: do i = 1, bodies
+        read(1,*) kep_el(1:6,i)
+        read(1,*) kep_el(7:12,i)
+      end do read_file1
+    else epoch
+      do j = 1, 19
+        read(1,*)
+      end do
+      read_file2: do i = 1, bodies
+        read(1,*) kep_el(1:10,i)
+        read(1,*) kep_el(11:20,i)
+      end do read_file2
+    end if epoch
 
   end subroutine read_kep_el
 
@@ -150,4 +160,43 @@ contains
     orbits % reu(6) =  sin(orbits % eu(2)) * sin(orbits % eu(1))
     orbits % reu(5) = -sin(orbits % eu(1)) * sin(orbits % eu(3)) + cos(orbits % eu(1)) * cos(orbits % eu(2)) * cos(orbits % eu(3))
   end subroutine rotate_orb_cart
+
+  subroutine accel_solar_system(x,y,dydx)
+    implicit none
+    real(dp), intent(in)  :: x, y(:)
+    real(dp), intent(out) :: dydx(:)
+    real(dp), parameter   :: conv = 1.49597870700
+    real(dp), parameter, dimension(10) :: g = -[1.32712440018d9,2.2032d2,3.24859d3,3.986004418d3,&
+    4.2828d2,1.26686534d6,3.7931187d5,5.793939d4,6.836529d4,8.71_dp]/conv
+    integer  :: i, j, m, n ! i and j are coutners. m and n are counters that increase by two
+    real(dp) :: norm, vec(3)
+
+    ! Initial acceleration is zero because we need to add the acceleration caused by all interactions.
+    dydx = 0._dp
+
+    ! M increases by two every iteration of the loop for the planets. This is due to mapping an n x 3 matrix to a vector with 3n entries.
+    m = 0
+    loop_planets: do i = 1, 10
+      ! N inreases by two every iteration of the acceleration. This is due to mapping an n x 3 matrix to a vector with 3n entries.
+      n = 0
+      loop_accel: do j = 1, 10
+        ! Check for self-interactions, and skip them. We need to add two to m because the potential energy difference between a celestial body and itself is zero, therefore the acceleration with respect to itself is zero.
+        if (j == i) then
+          m = m + 2
+          cycle loop_accel
+        end if
+        ! Calculate the components of the direction vector.
+        vec  =  y(j + m : j + 2 + m) - y(i + n: i + 2 + n)
+        ! Calculate the norm of the direction vector.
+        norm = sqrt( sum(vec(1:3)*vec(1:3)) )
+        ! Cube the norm.
+        norm = norm*norm*norm
+        ! Calculate the the total acceleration for a celestial body.
+        dydx(i + n: i + 2 + n) = g(j)*vec / norm + dydx(i + n: i + 2 + n)
+        m = m + 2
+      end do loop_accel
+      n = n + 2
+    end do loop_planets
+
+  end subroutine accel_solar_system
 end module orbital_mech
