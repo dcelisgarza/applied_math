@@ -28,7 +28,7 @@ program solar_system_main
   !print*, ''
   !print*, orbits(3)%x - orbits(2)%x
   !print*, '------------'
-  call integrate_orbits(orbits, 0._dp, 1._dp, 0.1_dp)
+  call integrate_orbits(orbits, 0._dp, 1._dp, 1._dp)
 
   100 format (10(3F8.4))
 

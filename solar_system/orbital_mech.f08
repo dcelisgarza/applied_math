@@ -28,7 +28,7 @@ contains
 
     open(unit = 1, file = 'solar_system.dat', status = 'replace', action = 'write', position = 'rewind')
     do i = 1, 10
-      write(1,110) orbits(i) % x(1:6)
+      write(1,*) orbits(i) % x(1:6)
     end do
 
     nbr_bodies = size(orbits)
@@ -58,15 +58,15 @@ contains
   !  print*,'--'
   !  print*, xi(19:24) - xi(7:12)
 
-    do t = start, end, dt
+    do while( t < end)
       !do i = 1, nbr_bodies
+        t = t+dt
         call velocity_verlet(accel_solar_system,t,xi,xf,dt)
         write(1,*) xf
         xi = xf
       !end do
     end do
-    100 format (F8.4)
-    110 format (6F8.4)
+    110 format (6F8.6)
     120 format (60F8.1)
   end subroutine integrate_orbits
 
@@ -192,7 +192,8 @@ contains
     integer  :: obj
 
     obj  = size(orbits)
-
+    ! Initial value of the eccentric anomaly is the mean anomaly.
+    orbits % ea = orbits % ma
     new_rap: do
       ea_1 = orbits % ea
       call kepler_eqn(kepeq,dkepeq,orbits)
@@ -226,10 +227,10 @@ contains
     dydx = 0._dp
 
     ! M increases by two every iteration of the loop for the planets. This is due to mapping an n x 6 matrix to a vector with 6n entries.
-    m = 0
-    loop_cel_bodies: do i = 1, 10
+    n = 0
+    loop_cel_bodies: do i = 1, 2
       ! N inreases by two every iteration of the acceleration. This is due to mapping an n x 6 matrix to a vector with 6n entries.
-      n = 0
+      m = 0
       loop_accel: do j = 1, 10
         ! Check for self-interactions, and skip them. We need to add two to m because the potential energy difference between a celestial body and itself is zero, therefore the acceleration with respect to itself is zero.
         if (j == i) then
@@ -237,17 +238,19 @@ contains
           cycle loop_accel
         end if
         ! Calculate the components of the direction vector.
+        !print*, i, j, y(j + m : j + 2 + m)
         vec  =  y(j + m : j + 2 + m) - y(i + n: i + 2 + n)
         ! Calculate the norm of the direction vector.
-        norm = sqrt( sum(vec(1:3)*vec(1:3)) )
+        norm = sqrt( sum(vec*vec) )
         ! Cube the norm.
         norm = norm*norm*norm
         ! Calculate the the total acceleration for a celestial body.
         dydx(i + n: i + 2 + n) = g(j)*vec / norm + dydx(i + n: i + 2 + n)
+        print*, dydx(1:3)
+        !if (i==4) print*, y(j + m : j + 2 + m)!, vec!i+n, j, g(j), vec, dydx(i+n:i+n+2)!, vec(1)*vec(1)
         m = m + 2 ! +5
       end do loop_accel
       n = n + 2 ! +5
     end do loop_cel_bodies
-!    print*, y(19:24) - y(7:12)
   end subroutine accel_solar_system
 end module orbital_mech
