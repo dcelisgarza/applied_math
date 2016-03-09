@@ -24,50 +24,37 @@ contains
     type(orb_par), intent(inout) :: orbits(:)
     real(dp),dimension(6*size(orbits)) :: xi, xf ! initial orbital positions and velocities
     real(dp) :: t  ! time
-    integer  :: i, nbr_bodies, n
+    integer  :: i, nbod, n
+
+    nbod = size(orbits)
+
+    open(1, file = 'vectors.txt')
+    read_init: do i = 1, nbod
+      read(1,*) orbits(i) % x(1:3) ! Positions, X, Y, Z.
+      read(1,*) orbits(i) % x(4:6) ! Velocities Vx, Vy, Vz.
+    end do read_init
+    close(1)
 
     open(unit = 1, file = 'solar_system.dat', status = 'replace', action = 'write', position = 'rewind')
-    do i = 1, 10
-      write(1,*) orbits(i) % x(1:6)
-    end do
 
-    nbr_bodies = size(orbits)
     n = 0
-    do i = 1, size(orbits)
+    ! Map orbital positions to a 1D array with 6n entries, where n = number of bodies.
+    do i = 1, nbod
+      ! xi(1:3*nbod) = x, y, z.
       xi(i+n:i+n+2) = orbits(i)%x(1:3)
-      xi(i+n+nbr_bodies*3:i+n+nbr_bodies*3+2) = orbits(i)%x(4:6)
+      ! xi(3*nbod+1:6*nbod) = vx, vy, vz.
+      xi(i+n+nbod*3:i+n+nbod*3+2) = orbits(i)%x(4:6)
       n = n + 2
     end do
 
-      !do i = 1, 10
-      !  write(*,110,advance='no') orbits(i) % x(4:6)
-      ! write(*,120) orbits(i) % x(4:6)
       write(1,*) xi
-      !end do
-      !print*,''
-      !print*, '-------'
-      !write(*,110) xi(31:60)
-
-    !do i = 1, size(orbits)
-    !  xi(i+n:i+2+n) = orbits(i)%x(1:3)
-    !  n = n + 5
-    !end do
-  !  print*, orbits(2)%x(1:6),' | ', xi(7:12)
-  !  print*,'--'
-  !  print*, orbits(3)%x(1:6),' | ', xi(13:18)
-  !  print*,'--'
-  !  print*, xi(19:24) - xi(7:12)
 
     do while( t < end)
-      !do i = 1, nbr_bodies
-        t = t+dt
         call velocity_verlet(accel_solar_system,t,xi,xf,dt)
+        t = t + dt
         write(1,*) xf
         xi = xf
-      !end do
     end do
-    110 format (6F8.6)
-    120 format (60F8.1)
   end subroutine integrate_orbits
 
   subroutine read_kep_el(filename, bodies, date_flag, kep_el)
@@ -217,28 +204,31 @@ contains
     implicit none
     real(dp), intent(in)  :: x, y(:)
     real(dp), intent(out) :: dydx(:)
-    real(dp), parameter   :: conv = 1.49597870700, secoday = 1._dp/86400._dp ! [m/Au]E-11.
-    real(dp), parameter, dimension(10) :: g = -[1.32712440018d9,2.2032d2,3.24859d3,3.986004418d3,&
-    4.2828d2,1.26686534d6,3.7931187d5,5.793939d4,6.836529d4,8.71_dp]/conv*secoday ! [AU days^(-2)]
+    real(dp), parameter   :: mau   = 1.495978707D+11, & ! m/Au
+                             m3mau3  = mau*mau*mau, &   ! m^3/Au^3
+                             sd  = 8.64D4, &            ! s/d
+                             s2d2 = sd*sd               ! s^2/d^2
+    real(dp), parameter, dimension(10) :: g = [1., 1., 1., 0., 0., 0., 0., 0., 0., 0.]!/m3mau3*s2d2
     integer  :: i, j, m, n ! i and j are coutners. m and n are counters that increase by two
     real(dp) :: norm, vec(3)
+    integer  :: nbod
 
+    nbod = size(y)/6
     ! Initial acceleration is zero because we need to add the acceleration caused by all interactions.
     dydx = 0._dp
 
-    ! M increases by two every iteration of the loop for the planets. This is due to mapping an n x 6 matrix to a vector with 6n entries.
+    ! M increases by two every iteration of the loop for the planets. This is due to mapping an n x 6 matrix to a vector with 6n entries, where n = # of bodies.
     n = 0
-    loop_cel_bodies: do i = 1, 2
-      ! N inreases by two every iteration of the acceleration. This is due to mapping an n x 6 matrix to a vector with 6n entries.
+    loop_cel_bodies: do i = 1, nbod
+      ! N inreases by two every iteration of the acceleration. This is due to mapping an n x 6 matrix to a vector with 6n entries, where n = # of bodies.
       m = 0
-      loop_accel: do j = 1, 10
+      loop_accel: do j = 1, nbod
         ! Check for self-interactions, and skip them. We need to add two to m because the potential energy difference between a celestial body and itself is zero, therefore the acceleration with respect to itself is zero.
         if (j == i) then
-          m = m + 2 ! +5
+          m = m + 2
           cycle loop_accel
         end if
         ! Calculate the components of the direction vector.
-        !print*, i, j, y(j + m : j + 2 + m)
         vec  =  y(j + m : j + 2 + m) - y(i + n: i + 2 + n)
         ! Calculate the norm of the direction vector.
         norm = sqrt( sum(vec*vec) )
@@ -246,11 +236,9 @@ contains
         norm = norm*norm*norm
         ! Calculate the the total acceleration for a celestial body.
         dydx(i + n: i + 2 + n) = g(j)*vec / norm + dydx(i + n: i + 2 + n)
-        print*, dydx(1:3)
-        !if (i==4) print*, y(j + m : j + 2 + m)!, vec!i+n, j, g(j), vec, dydx(i+n:i+n+2)!, vec(1)*vec(1)
-        m = m + 2 ! +5
+        m = m + 2
       end do loop_accel
-      n = n + 2 ! +5
+      n = n + 2
     end do loop_cel_bodies
   end subroutine accel_solar_system
 end module orbital_mech
