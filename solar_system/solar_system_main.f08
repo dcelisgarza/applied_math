@@ -2,12 +2,13 @@ program solar_system_main
   use orbital_mech
   implicit none
   real(dp) :: kep_el(20,10) ! Keplerian elements of the bodies of the solar system.
-  type(orb_par) :: orbits(3) ! Orbits of the solar system.
+  type(orb_par) :: orbits(10) ! Orbits of the solar system.
   character(:), allocatable :: filename
   integer  :: i
-  real(dp) :: t, dt ! time, increment in time.
+  real(dp) :: t, dt, finish ! time, increment in time.
 
-  dt = 0.1_dp
+  dt = 1._dp
+  finish =  690._dp
 
 
   ! Read keplerian elements.
@@ -21,5 +22,5 @@ program solar_system_main
   !call state_vec(orbits,1d-6)
 
   ! Evolve the trajectories with time.
-  call integrate_orbits(orbits, 0._dp, 10._dp, dt)
+  call integrate_orbits(orbits, 0._dp, finish, dt)
 end program solar_system_main

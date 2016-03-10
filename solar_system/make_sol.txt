@@ -20,7 +20,7 @@ solar_system_main.o: solar_system_main.f08
 	$(f08comp) $(FCFLAGS) -c solar_system_main.f08
 # Cleaning everything
 clean:
-	rm -f *.o *.mod
+	rm -f *.o *.mod .dat
 clobber: clean
 	rm -f $(target)
 .PHONY: default clean cobbler

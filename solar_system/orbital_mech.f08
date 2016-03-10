@@ -52,7 +52,7 @@ contains
     do while( t < end)
         call velocity_verlet(accel_solar_system,t,xi,xf,dt)
         t = t + dt
-        write(1,*) xf
+        if (mod(t, 2.*dt) == 0.) write(1,*) xf
         xi = xf
     end do
   end subroutine integrate_orbits
@@ -204,11 +204,13 @@ contains
     implicit none
     real(dp), intent(in)  :: x, y(:)
     real(dp), intent(out) :: dydx(:)
-    real(dp), parameter   :: mau   = 1.495978707D+11, & ! m/Au
-                             m3mau3  = mau*mau*mau, &   ! m^3/Au^3
-                             sd  = 8.64D4, &            ! s/d
-                             s2d2 = sd*sd               ! s^2/d^2
-    real(dp), parameter, dimension(10) :: g = [1., 1., 1., 0., 0., 0., 0., 0., 0., 0.]!/m3mau3*s2d2
+    real(dp), parameter   :: kmau   = 1.495978707E+8, &   ! km/Au
+                             km3au3  = kmau*kmau*kmau, &  ! km^3/Au^3
+                             sd  = 8.64E+4, &             ! s/d
+                             s2d2 = sd*sd                 ! s^2/d^2
+    real(dp), parameter, dimension(10) :: g = [1.3271244004193938E+11, 2.203209E+4, 3.2485863E+5, &
+                                               3.9860044E+5, 4.28283E+4, 1.26686511E+8, 3.79312078E+7,&
+                                               5.793966E+6, 6.835107E+6, 872.4]/km3au3*s2d2
     integer  :: i, j, m, n ! i and j are coutners. m and n are counters that increase by two
     real(dp) :: norm, vec(3)
     integer  :: nbod
