@@ -52,7 +52,7 @@ contains
     do while( t < end)
         call velocity_verlet(accel_solar_system,t,xi,xf,dt)
         t = t + dt
-        if (mod(t, 2.*dt) == 0.) write(1,*) xf
+        if (mod(t, 20.*dt) == 0.) write(1,*) xf
         xi = xf
     end do
   end subroutine integrate_orbits

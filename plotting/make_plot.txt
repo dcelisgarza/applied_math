@@ -1,0 +1,20 @@
+# Defining variables.
+target = plot.out
+objects = plot.o plot_main.o
+f08comp = gfortran
+FCFLAGS = -g
+#FCFLAGS = -O2 -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
+# Makefile
+default: $(target)
+$(target): $(objects)
+	$(f08comp) $(objects) $(FCFLAGS) -o $@
+plot_main.o: plot_main.f08
+	$(f08comp) $(FCFLAGS) -c plot_main.f08
+plot.o: plot.f08
+	$(f08comp) $(FCFLAGS) -c plot.f08
+# Cleaning everything
+clean:
+	rm -f *.o *.mod .dat
+clobber: clean
+	rm -f $(target)
+.PHONY: default clean cobbler

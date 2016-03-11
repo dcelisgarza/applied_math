@@ -6,10 +6,9 @@ import matplotlib.animation as anm
 
 
 #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
-
 plt.close('all')
 data = np.loadtxt('solar_system.dat')
-data2 = data[:,0:15]
+data2 = data[:,15:30]
 
 fig = plt.figure()
 ax = p3.Axes3D(fig)
@@ -50,7 +49,7 @@ def init():
 
 def animate(i):
     # we'll step two time-steps per frame.  This leads to nice results.
-    #i = (2 * i) % data3.shape[1]
+    i = (4 * i) % data3.shape[1]
 
     for line, pt, xi in zip(lines, pts, data3):
         x, y, z = xi[:i,0:3].T
@@ -68,5 +67,4 @@ anim = anm.FuncAnimation(fig, animate, init_func=init,
                               frames=int(np.size(data2[:,0])), interval=1, blit=True)
 
 #writer = anm.writers['ffmpeg'](fps=30)
-anim.save('inner_sol_sys.mp4', 'ffmpeg_file', fps=15, extra_args=['-vcodec', 'libx264']
-)#, 'ffmpeg_file', fps=15, extra_args=['-vcodec', 'libx264']
+#anim.save('inner_sol_sys.mp4', fps=15, extra_args=['-vcodec', 'libx264'])#, 'ffmpeg_file', fps=15, extra_args=['-vcodec', 'libx264']

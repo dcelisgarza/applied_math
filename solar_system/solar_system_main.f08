@@ -8,7 +8,7 @@ program solar_system_main
   real(dp) :: t, dt, finish ! time, increment in time.
 
   dt = 1._dp
-  finish =  690._dp
+  finish =  65000._dp
 
 
   ! Read keplerian elements.
