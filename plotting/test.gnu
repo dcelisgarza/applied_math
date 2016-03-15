@@ -7,3 +7,4 @@
  set output 'test.eps'
  set terminal epslatex size 10,2 color colortext 14
  set output 'test.tex'
+ plot 'test.dat' u   1:   2, 'test.dat' u   3:   4, 'test.dat' u   5:   6

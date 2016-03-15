@@ -8,7 +8,7 @@ program solar_system_main
   real(dp) :: t, dt, finish ! time, increment in time.
 
   dt = 1._dp
-  finish =  65000._dp
+  finish =  90600._dp
 
 
   ! Read keplerian elements.
@@ -23,4 +23,8 @@ program solar_system_main
 
   ! Evolve the trajectories with time.
   call integrate_orbits(orbits, 0._dp, finish, dt)
+
+  call wxtterm("solar_system", "500,500", 'Helvetica', '8')
+  call dplot3d("solar_system",[(i, i = 16, 30)],5)
+  close(1)
 end program solar_system_main

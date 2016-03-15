@@ -1,6 +1,7 @@
 module orbital_mech
   use nrtype
   use ode_int, only : velocity_verlet
+  use plot
 
   type orb_par
     real(dp) :: a  ! Major semi-axis.
@@ -52,7 +53,7 @@ contains
     do while( t < end)
         call velocity_verlet(accel_solar_system,t,xi,xf,dt)
         t = t + dt
-        if (mod(t, 20.*dt) == 0.) write(1,*) xf
+        if (mod(t, 50.*dt) == 0.) write(1,*) xf
         xi = xf
     end do
   end subroutine integrate_orbits

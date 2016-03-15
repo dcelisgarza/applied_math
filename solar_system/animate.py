@@ -8,7 +8,7 @@ import matplotlib.animation as anm
 #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
 plt.close('all')
 data = np.loadtxt('solar_system.dat')
-data2 = data[:,15:30]
+data2 = data[:,0:3]
 
 fig = plt.figure()
 ax = p3.Axes3D(fig)
@@ -49,7 +49,7 @@ def init():
 
 def animate(i):
     # we'll step two time-steps per frame.  This leads to nice results.
-    i = (4 * i) % data3.shape[1]
+    #i = (4 * i) % data3.shape[1]
 
     for line, pt, xi in zip(lines, pts, data3):
         x, y, z = xi[:i,0:3].T
@@ -59,7 +59,7 @@ def animate(i):
         pt.set_data(x[-1:], y[-1:])
         pt.set_3d_properties(z[-1:])
 
-    ax.view_init(30, 0.3 * i)
+    #ax.view_init(30, 0.3 * i)
     fig.canvas.draw()
     return pts + lines
     
