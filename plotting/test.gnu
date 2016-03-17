@@ -1,10 +1,3 @@
- set terminal wxt \
- size          500 ,          500  \
- enhanced font \
- 'Helvetica \
- ,           12  \
- ' \
- persist
  set terminal pngcairo \
  size          500 ,          500  \
  enhanced font \
@@ -12,19 +5,10 @@
  ,           12  \
  '
  set output 'test.png'
- set terminal svg \
- size          500 ,          500  \
- enhanced font \
- 'Helvetica \
- ,           12  \
- '
- set output 'test.svg'
- set terminal postscript eps \
- size    5.00000000      \
- cm,    5.00000000     cm \
- enhanced color \
- font 'Helvetica \
- ,           12  \
- ' \
- linewidth    3.00000000    
- set output 'test.eps'
+ n = 0
+ do for [i =            0 :          12 ] {
+ n = n + 1
+ set output sprintf('tmp/test%d.png',n)
+ plot 'test.dat' every ::           0 ::i w l, \
+ 'test.dat' every ::i::i w p
+ }

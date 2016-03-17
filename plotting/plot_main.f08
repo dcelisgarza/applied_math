@@ -26,14 +26,17 @@ program plot_main
   nplots = 3
   nplot_size = [500,500]
 
-  call wxtterm(filename, nplot_size, font, 12)
+  !call wxtterm(filename, nplot_size, font, 12)
   call pngterm(filename, plot_name, nplot_size, font, 12)
-  call svgterm(filename, plot_name, nplot_size, font, 12)
-  call epsterm(filename, plot_name, [5.,5.], "cm",font, 12, 3.)
-  !call epslatexterm(filename, plot_name, plot_size, font, font_size)
+  !call svgterm(filename, plot_name, nplot_size, font, 12)
+  !call epsterm(filename, plot_name, [5.,5.], "cm",font, 12)
+  !call epslatexterm(filename, plot_name, [5.,5.], "cm")
   !call dplot2d(filename,using,nplots)
   !call format(xlabel,ylabel,zlabel,title,fmt)
   !call ticks(xticks,yticks,zticks)
   !call range(xrange,yrange,zrange)
+  call system("mkdir tmp")
+  call danim2d('test',[1,13],"test")
+  !call system("rm -rf tmp")
 
 end program plot_main

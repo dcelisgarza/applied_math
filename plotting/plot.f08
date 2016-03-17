@@ -86,7 +86,7 @@ subroutine svgterm(filename, plot_name, plot_size, font, font_size)
   integer, intent(in), optional          :: font_size
 
   open(unit = 1, file = filename//'.gnu')
-  write(1,*) "set terminal svg \" !// plot_size // " fname '" // font // " fsize " // font_size
+  write(1,*) "set terminal svg \"
 
   plt_size: if (present(plot_size) .eqv. .true.) then
     write(1,*) "size ", plot_size(1), ", " , plot_size(2), " \"
@@ -105,13 +105,12 @@ subroutine svgterm(filename, plot_name, plot_size, font, font_size)
   write(1,*) "set output '" // plot_name // ".svg'"
 end subroutine svgterm
 
-subroutine epsterm(filename, plot_name, plot_size, plot_size_units, font, font_size, linewidth)
+subroutine epsterm(filename, plot_name, plot_size, plot_size_units, font, font_size)
   implicit none
   character(len=*), intent(in):: filename, plot_name
   character(len=*), intent(in), optional :: font, plot_size_units
   real(4), intent(in), optional          :: plot_size(2)
   integer, intent(in), optional          :: font_size
-  real(4), intent(in), optional          :: linewidth
 
   open(unit = 1, file = filename//'.gnu')
   write(1,*) "set terminal postscript eps \"
@@ -135,17 +134,29 @@ subroutine epsterm(filename, plot_name, plot_size, plot_size_units, font, font_s
     write(1,*) "' \"
   end if fnt
 
-  if (present(linewidth) .eqv. .true.) write(1,*) "linewidth ", linewidth
-
   write(1,*) "set output '" // plot_name // ".eps'"
 end subroutine epsterm
 
-subroutine epslatexterm(filename, plot_name, plot_size, font, font_size)
+subroutine epslatexterm(filename, plot_name, plot_size, plot_size_units)
   implicit none
-  character(len=*), intent(in):: filename, plot_name, plot_size, font, font_size
+  character(len=*), intent(in):: filename, plot_name
+  character(len=*), intent(in), optional :: plot_size_units
+  real(4), intent(in), optional          :: plot_size(2)
 
   open(unit = 1, file = filename//'.gnu')
-  write(1,*) "set terminal epslatex size " // plot_size // " color colortext " // font_size
+  write(1,*) "set terminal epslatex \"
+
+  plt_size: if (present(plot_size) .eqv. .true.) then
+    write(1,*) "size ", plot_size(1), " \"
+    plt_size_units: if (present(plot_size_units) .eqv. .true.) then
+      write(1,*) plot_size_units // ", ", plot_size(2), plot_size_units, " \"
+    else plt_size_units
+      write(1,*) ", ", plot_size(2), " \"
+    end if plt_size_units
+  end if plt_size
+
+  write(1,*) "color colortext"
+
   write(1,*) "set output '" // plot_name // ".tex'"
 end subroutine epslatexterm
 
@@ -241,5 +252,54 @@ subroutine dplot3d(filename,using,nplots)
     end do plots_loop
   end if columns
 end subroutine dplot3d
+
+subroutine danim2d(dfilename,interval,pngname)
+  implicit none
+  character(len=*), intent(in)   :: dfilename, pngname ! Data file name, magnitu
+  integer, intent(in), optional  :: interval(2)
+  integer                        :: i, j, k
+  character(len=len(dfilename)+4) :: cdfilename ! Complete data filename
+
+  ! Getting the data file name
+  cdfilename = dfilename // ".dat"
+
+  write(1,*) "n = 0"
+  write(1,*) "do for [i = ", interval(1)-1, ":", interval(2), "] {"
+  write(1,*) "n = n + 1"
+  write(1,*) "set output sprintf('tmp/"//pngname//"%d.png',n)"
+  ! EXPLANATION OF EVERY http://xmodulo.com/how-to-plot-using-specific-rows-of-data-file-with-gnuplot.html
+  ! plot "my.dat" every A:B:C:D:E:F
+  ! A: line increment
+  ! B: data block increment
+  ! C: The first line
+  ! D: The first data block
+  ! E: The last line
+  ! F: The last data block
+  write(1,*) "plot '"//cdfilename//"' every ::", interval(1)-1, "::i w l, \"
+  ! Condition this later on to make it visible under user command.
+  write(1,*) "'"//cdfilename//"' every ::i::i w p"
+  write(1,*) "}"
+
+end subroutine danim2d
+
+subroutine danim3d(filename,interval,mag_frames,pngname)
+  implicit none
+  character(len=*), intent(in)   :: filename, mag_frames, pngname
+  integer, intent(in), optional  :: interval(2)
+  integer                        :: i, j, k
+  character(len=len(filename)+4) :: dfilename
+
+  ! Getting the data file name
+  dfilename = filename // ".dat"
+
+  write(1,*) "n = 0"
+  write(1,*) "do for [i = ", interval(1), ":", interval(2), "] {"
+  write(1,*) "n = n + 1"
+  write(1,*) "set output sprintf('tmp/"//pngname//"%d.png',n)"
+  write(1,*) "splot '"//dfilename//"' every :3:", interval(1), "::i w l \"
+  ! Condition this later on to make it visible under user command.
+  write(1,*) "splot '"//dfilename//"' every :3:i::i w p"
+  write(1,*) "}"
+end subroutine danim3d
 
 end module plot
