@@ -53,10 +53,9 @@ end subroutine wxtterm
 
 subroutine pngterm(filename, plot_name, plot_size, font, font_size)
   implicit none
-  character(len=*), intent(in):: filename, plot_name
-  character(len=*), intent(in), optional :: font
-  integer, intent(in), optional          :: plot_size(2)
-  integer, intent(in), optional          :: font_size
+  character(len=*), intent(in):: filename
+  character(len=*), intent(in), optional :: font, plot_name
+  integer, intent(in), optional          :: plot_size(2), font_size
 
   open(unit = 1, file = filename//'.gnu')
   write(1,*) "set terminal pngcairo \"
@@ -75,15 +74,14 @@ subroutine pngterm(filename, plot_name, plot_size, font, font_size)
     write(1,*) "'"
   end if fnt
 
-  write(1,*) "set output '" // plot_name // ".png'"
+  if (present(plot_name) .eqv. .true.) write(1,*) "set output '" // plot_name // ".png'"
 end subroutine pngterm
 
 subroutine svgterm(filename, plot_name, plot_size, font, font_size)
   implicit none
   character(len=*), intent(in):: filename, plot_name
   character(len=*), intent(in), optional :: font
-  integer, intent(in), optional          :: plot_size(2)
-  integer, intent(in), optional          :: font_size
+  integer, intent(in), optional          :: plot_size(2), font_size
 
   open(unit = 1, file = filename//'.gnu')
   write(1,*) "set terminal svg \"
@@ -205,12 +203,12 @@ subroutine linestyle(l, lc, lt, lw, pt, ps)
   integer, intent(in), optional           :: lt, pt
   real(4), intent(in), optional           :: lw, ps
 
-  write(1, "(A,i2)", advance = "no") " set style line", l, " "
-  if (present(lc) .eqv. .true.) write(1, "(A)",     advance = "no") "lc " // lc
-  if (present(lt) .eqv. .true.) write(1, "(A, i2)", advance = "no") "lt ", lt
-  if (present(lw) .eqv. .true.) write(1, "(A, i2)", advance = "no") "lw ", lw
-  if (present(pt) .eqv. .true.) write(1, "(A, i2)", advance = "no") "pt ", pt
-  if (present(pt) .eqv. .true.) write(1, "(A, i2)", advance = "no") "ps ", ps
+  write(1,*) " set style line", l, " \"
+  if (present(lc) .eqv. .true.) write(1,*) "lc " // lc // " \"
+  if (present(lt) .eqv. .true.) write(1,*) "lt ", lt, " \"
+  if (present(lw) .eqv. .true.) write(1,*) "lw ", lw, " \"
+  if (present(pt) .eqv. .true.) write(1,*) "pt ", pt, " \"
+  if (present(pt) .eqv. .true.) write(1,*) "ps ", ps
 end subroutine linestyle
 
 subroutine dplot2d(filename,using,nplots)
@@ -223,11 +221,12 @@ subroutine dplot2d(filename,using,nplots)
   dfilename = filename // ".dat"
 
   j = 0
-  write(1,"(A)", advance = "no") " plot '" // dfilename // "' "
+  write(1,*) " plot '" // dfilename // "' \"
   columns: if (present(using) .eqv. .true.) then
     plots_loop: do i = 1, nplots
-      if (i > 1) write(1,"(A)", advance = "no") ", '" // dfilename // "' "
-      write(1,"(2(A, i3))", advance = "no") "u ", using(i+j), ": ", using(i+1+j)
+      if (i > 1) write(1,*) ", '" // dfilename // "' \"
+      write(1,*) "u ", using(i+j), ": ", using(i+1+j), " \"
+      ! Add optional parameter for lines, linepoints or points.
       j = j + 1
     end do plots_loop
   end if columns
@@ -243,30 +242,24 @@ subroutine dplot3d(filename,using,nplots)
   dfilename = filename // ".dat"
 
   j = 0
-  write(1,"(A)", advance = "no") " splot '" // dfilename // "' "
+  write(1,*) " splot '" // dfilename // "' \"
   columns: if (present(using) .eqv. .true.) then
     plots_loop: do i = 1, nplots
-      if (i > 1) write(1,"(A)", advance = "no") ", '" // dfilename // "' "
-      write(1,"(3(A, i3))", advance = "no") "u ", using(i+j), ": ", using(i+1+j), ": ", using(i+2+j)
+      if (i > 1) write(1,*) ", '" // dfilename // "' \"
+      write(1,*) "u ", using(i+j), ": ", using(i+1+j), ": ", using(i+2+j), " \"
+      ! Add an optional linear array of size 2, with one entry being deciding whether to use lines, linepoints or points and the second being the corresponding line style. And don't forget about the title!
       j = j + 2
     end do plots_loop
   end if columns
 end subroutine dplot3d
 
-subroutine danim2d(dfilename,interval,pngname)
+subroutine adplot3d(dfilename,pngname,interval,step,using,nplots)
   implicit none
-  character(len=*), intent(in)   :: dfilename, pngname ! Data file name, magnitu
-  integer, intent(in), optional  :: interval(2)
-  integer                        :: i, j, k
-  character(len=len(dfilename)+4) :: cdfilename ! Complete data filename
-
-  ! Getting the data file name
-  cdfilename = dfilename // ".dat"
-
-  write(1,*) "n = 0"
-  write(1,*) "do for [i = ", interval(1)-1, ":", interval(2), "] {"
-  write(1,*) "n = n + 1"
-  write(1,*) "set output sprintf('tmp/"//pngname//"%d.png',n)"
+  character(len=*), intent(in)   :: dfilename, pngname
+  integer, intent(in)            :: interval(2)
+  integer, intent(in), optional  :: step, using(:), nplots
+  integer                        :: i, j
+  character(len=len(dfilename)+4) :: cdfilename
   ! EXPLANATION OF EVERY http://xmodulo.com/how-to-plot-using-specific-rows-of-data-file-with-gnuplot.html
   ! plot "my.dat" every A:B:C:D:E:F
   ! A: line increment
@@ -275,31 +268,77 @@ subroutine danim2d(dfilename,interval,pngname)
   ! D: The first data block
   ! E: The last line
   ! F: The last data block
-  write(1,*) "plot '"//cdfilename//"' every ::", interval(1)-1, "::i w l, \"
-  ! Condition this later on to make it visible under user command.
-  write(1,*) "'"//cdfilename//"' every ::i::i w p"
-  write(1,*) "}"
-
-end subroutine danim2d
-
-subroutine danim3d(filename,interval,mag_frames,pngname)
-  implicit none
-  character(len=*), intent(in)   :: filename, mag_frames, pngname
-  integer, intent(in), optional  :: interval(2)
-  integer                        :: i, j, k
-  character(len=len(filename)+4) :: dfilename
-
-  ! Getting the data file name
-  dfilename = filename // ".dat"
+  cdfilename = dfilename // ".dat"
 
   write(1,*) "n = 0"
-  write(1,*) "do for [i = ", interval(1), ":", interval(2), "] {"
+  if (present(step) .eqv. .true.) then
+    write(1,*) "do for [i = ", interval(1), ":", interval(2), ":", step, "] {"
+  else
+    write(1,*) "do for [i = ", interval(1), ":", interval(2), "] {"
+  end if
   write(1,*) "n = n + 1"
   write(1,*) "set output sprintf('tmp/"//pngname//"%d.png',n)"
-  write(1,*) "splot '"//dfilename//"' every :3:", interval(1), "::i w l \"
-  ! Condition this later on to make it visible under user command.
-  write(1,*) "splot '"//dfilename//"' every :3:i::i w p"
+
+  write(1,*) " splot '" // cdfilename // "' \"
+  columns: if (present(using) .eqv. .true.) then
+    j = 0
+    plots_loop: do i = 1, nplots
+      if (i > 1) write(1,*) ", '" // cdfilename // "' \"
+      write(1,*) "u ", using(i+j), ": ", using(i+1+j), ": ", using(i+2+j), " \"
+      write(1,*) "every ::", interval(1), "::i w l ls ", i," \"
+      write(1,*) ", '"// cdfilename //"' u ", using(i+j), ": ", using(i+1+j), ": ", using(i+2+j), " \"
+      write(1,*) "every ::i::i w p ls ", i," \"
+      j = j + 2
+    end do plots_loop
+  else columns
+    write(1,*) "every ::", interval(1), "::i w l ls 1 \"
+    write(1,*) ", '"// cdfilename //" every ::i::i w p ls 1 \"
+  end if columns
   write(1,*) "}"
-end subroutine danim3d
+end subroutine adplot3d
+
+subroutine adplot2d(dfilename,pngname,interval,step,using,nplots)
+  implicit none
+  character(len=*), intent(in)   :: dfilename, pngname
+  integer, intent(in), optional  :: step, using(:), nplots
+  integer, intent(in)            :: interval(2)
+  integer                        :: i, j
+  character(len=len(dfilename)+4) :: cdfilename
+  ! EXPLANATION OF EVERY http://xmodulo.com/how-to-plot-using-specific-rows-of-data-file-with-gnuplot.html
+  ! plot "my.dat" every A:B:C:D:E:F
+  ! A: line increment
+  ! B: data block increment
+  ! C: The first line
+  ! D: The first data block
+  ! E: The last line
+  ! F: The last data block
+  cdfilename = dfilename // ".dat"
+
+  write(1,*) "n = 0"
+  if (present(step) .eqv. .true.) then
+    write(1,*) "do for [i = ", interval(1), ":", interval(2), ":", step, "] {"
+  else
+    write(1,*) "do for [i = ", interval(1), ":", interval(2), "] {"
+  end if
+  write(1,*) "n = n + 1"
+  write(1,*) "set output sprintf('tmp/"//pngname//"%d.png',n)"
+
+  write(1,*) " splot '" // cdfilename // "' \"
+  columns: if (present(using) .eqv. .true.) then
+    j = 0
+    plots_loop: do i = 1, nplots
+      if (i > 1) write(1,*) ", '" // cdfilename // "' \"
+      write(1,*) "u ", using(i+j), ": ", using(i+1+j), " \"
+      write(1,*) "every ::", interval(1), "::i w l ls ", i," \"
+      write(1,*) ", '"// cdfilename //"' u ", using(i+j), ": ", using(i+1+j), " \"
+      write(1,*) "every ::i::i w p ls ", i," \"
+      j = j + 2
+    end do plots_loop
+  else columns
+    write(1,*) "every ::", interval(1), "::i w l ls 1 \"
+    write(1,*) ", '"// cdfilename //" every ::i::i w p ls 1 \"
+  end if columns
+  write(1,*) "}"
+end subroutine adplot2d
 
 end module plot

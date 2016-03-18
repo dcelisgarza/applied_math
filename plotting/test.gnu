@@ -4,11 +4,18 @@
  'Helvetica \
  ,           12  \
  '
- set output 'test.png'
  n = 0
- do for [i =            0 :          12 ] {
+ do for [i =            0 :         100 :           1 ] {
  n = n + 1
- set output sprintf('tmp/test%d.png',n)
- plot 'test.dat' every ::           0 ::i w l, \
- 'test.dat' every ::i::i w p
+ set output sprintf('tmp/solar_system%d.png',n)
+  splot 'solar_system.dat' \
+ u            1 :            2 :            3  \
+ every ::           0 ::i w l ls            1  \
+ , 'solar_system.dat' u            1 :            2 :            3  \
+ every ::i::i w p ls            1  \
+ , 'solar_system.dat' \
+ u            4 :            5 :            6  \
+ every ::           0 ::i w l ls            2  \
+ , 'solar_system.dat' u            4 :            5 :            6  \
+ every ::i::i w p ls            2  \
  }

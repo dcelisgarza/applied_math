@@ -1,7 +1,6 @@
 module orbital_mech
   use nrtype
   use ode_int, only : velocity_verlet
-  use plot
 
   type orb_par
     real(dp) :: a  ! Major semi-axis.
@@ -19,24 +18,23 @@ module orbital_mech
   end type orb_par
 
 contains
-  subroutine integrate_orbits(orbits, start, end, dt)
+  subroutine integrate_orbits(orbits, start, end, dt, rec)
     implicit none
-    real(dp), intent(in) :: start, end, dt
+    real(dp), intent(in) :: start, end, dt, rec
     type(orb_par), intent(inout) :: orbits(:)
     real(dp),dimension(6*size(orbits)) :: xi, xf ! initial orbital positions and velocities
     real(dp) :: t  ! time
     integer  :: i, nbod, n
 
     nbod = size(orbits)
+    t    = start
 
-    open(1, file = 'vectors.txt')
+    open(2, file = 'vectors.txt')
     read_init: do i = 1, nbod
-      read(1,*) orbits(i) % x(1:3) ! Positions, X, Y, Z.
-      read(1,*) orbits(i) % x(4:6) ! Velocities Vx, Vy, Vz.
+      read(2,*) orbits(i) % x(1:3) ! Positions, X, Y, Z.
+      read(2,*) orbits(i) % x(4:6) ! Velocities Vx, Vy, Vz.
     end do read_init
-    close(1)
-
-    open(unit = 1, file = 'solar_system.dat', status = 'replace', action = 'write', position = 'rewind')
+    close(2)
 
     n = 0
     ! Map orbital positions to a 1D array with 6n entries, where n = number of bodies.
@@ -48,12 +46,12 @@ contains
       n = n + 2
     end do
 
-      write(1,*) xi
+    write(1,*) xi
 
     do while( t < end)
         call velocity_verlet(accel_solar_system,t,xi,xf,dt)
         t = t + dt
-        if (mod(t, 50.*dt) == 0.) write(1,*) xf
+        if (mod(t, rec*dt) == 0.) write(1,*) xi
         xi = xf
     end do
   end subroutine integrate_orbits
@@ -210,7 +208,7 @@ contains
                              sd  = 8.64E+4, &             ! s/d
                              s2d2 = sd*sd                 ! s^2/d^2
     real(dp), parameter, dimension(10) :: g = [1.3271244004193938E+11, 2.203209E+4, 3.2485863E+5, &
-                                               3.9860044E+5, 4.28283E+4, 1.26686511E+8, 3.79312078E+7,&
+                                               3.9860044E+5, 4.28283E+4, 1.26686511E+8, 3.79312078E+7, &
                                                5.793966E+6, 6.835107E+6, 872.4]/km3au3*s2d2
     integer  :: i, j, m, n ! i and j are coutners. m and n are counters that increase by two
     real(dp) :: norm, vec(3)

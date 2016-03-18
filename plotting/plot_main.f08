@@ -32,11 +32,13 @@ program plot_main
   !call epsterm(filename, plot_name, [5.,5.], "cm",font, 12)
   !call epslatexterm(filename, plot_name, [5.,5.], "cm")
   !call dplot2d(filename,using,nplots)
+  !call dplot3d(filename,using,nplots)
   !call format(xlabel,ylabel,zlabel,title,fmt)
   !call ticks(xticks,yticks,zticks)
   !call range(xrange,yrange,zrange)
+  call adplot3d('solar_system','solar_system',[1,100],1,using,size(using)/3)
   call system("mkdir tmp")
-  call danim2d('test',[1,13],"test")
+  !call danim2d('test',[1,13],"test")
   !call system("rm -rf tmp")
 
 end program plot_main
