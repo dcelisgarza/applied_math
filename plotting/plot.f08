@@ -1,5 +1,11 @@
 module plot
 implicit none
+
+  type titles
+    character(:), allocatable :: title
+    integer                   :: length
+  end type titles
+
 contains
 
 ! GNUPlot Terminals.
@@ -158,16 +164,19 @@ subroutine epslatexterm(filename, plot_name, plot_size, plot_size_units)
   write(1,*) "set output '" // plot_name // ".tex'"
 end subroutine epslatexterm
 
-subroutine format(xlabel,ylabel,zlabel,title,fmt)
+subroutine format(xlabel,ylabel,zlabel,title)
   implicit none
-  character(len=*), intent(in), optional :: xlabel, ylabel, zlabel, title, fmt
+  character(len=*), intent(in), optional :: xlabel, ylabel, zlabel, title
 
   if (present(xlabel) .eqv. .true.) write(1,*) "set xlabel '" // xlabel // "'"
   if (present(ylabel) .eqv. .true.) write(1,*) "set ylabel '" // ylabel // "'"
-  if (present(zlabel) .eqv. .true.) write(1,*) "set xlabel '" // zlabel // "'"
+  if (present(zlabel) .eqv. .true.) write(1,*) "set zlabel '" // zlabel // "'"
   if (present(title)  .eqv. .true.) write(1,*) "set title '"  // title  // "'"
-  if (present(fmt)    .eqv. .true.) write(1,*) "set format '" // fmt    // "'"
 end subroutine format
+
+! For axis formats
+! fmt
+! if (present(fmt)    .eqv. .true.) write(1,*) "set format '" // fmt    // "'"
 
 subroutine ticks(xticks,yticks,zticks)
   implicit none
@@ -183,8 +192,8 @@ subroutine range(xrange,yrange,zrange)
   real(4), intent(in), optional :: xrange(2), yrange(2), zrange(2)
 
   if (present(xrange) .eqv. .true.) write(1,*) "set xrange [", xrange(1), ": ", xrange(2), "]"
-  if (present(yrange) .eqv. .true.) write(1,*) "set yrange [", yrange(1), ": ", xrange(2), "]"
-  if (present(zrange) .eqv. .true.) write(1,*) "set xrange [", zrange(1), ": ", xrange(2), "]"
+  if (present(yrange) .eqv. .true.) write(1,*) "set yrange [", yrange(1), ": ", yrange(2), "]"
+  if (present(zrange) .eqv. .true.) write(1,*) "set zrange [", zrange(1), ": ", zrange(2), "]"
 end subroutine range
 
 subroutine scale(xscale,yscale,zscale)
@@ -253,13 +262,14 @@ subroutine dplot3d(filename,using,nplots)
   end if columns
 end subroutine dplot3d
 
-subroutine adplot3d(dfilename,pngname,interval,step,using,nplots)
+subroutine adplot3d(dfilename,pngname,interval,step,using,nplots,title)
   implicit none
-  character(len=*), intent(in)   :: dfilename, pngname
-  integer, intent(in)            :: interval(2)
-  integer, intent(in), optional  :: step, using(:), nplots
-  integer                        :: i, j
-  character(len=len(dfilename)+4) :: cdfilename
+  character(len=*), intent(in)       :: dfilename, pngname
+  integer, intent(in)                :: interval(2)
+  integer, intent(in), optional      :: step, using(:), nplots
+  character(len=*), optional         :: title(:)
+  integer                            :: i, j
+  character(len=len(dfilename)+4)    :: cdfilename
   ! EXPLANATION OF EVERY http://xmodulo.com/how-to-plot-using-specific-rows-of-data-file-with-gnuplot.html
   ! plot "my.dat" every A:B:C:D:E:F
   ! A: line increment
@@ -286,8 +296,10 @@ subroutine adplot3d(dfilename,pngname,interval,step,using,nplots)
       if (i > 1) write(1,*) ", '" // cdfilename // "' \"
       write(1,*) "u ", using(i+j), ": ", using(i+1+j), ": ", using(i+2+j), " \"
       write(1,*) "every ::", interval(1), "::i w l ls ", i," \"
+      write(1,*) "notitle \"
       write(1,*) ", '"// cdfilename //"' u ", using(i+j), ": ", using(i+1+j), ": ", using(i+2+j), " \"
       write(1,*) "every ::i::i w p ls ", i," \"
+      write(1,*) "title '", trim(title(i)), "' \"
       j = j + 2
     end do plots_loop
   else columns
