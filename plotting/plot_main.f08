@@ -40,5 +40,4 @@ program plot_main
   call system("mkdir tmp")
   !call danim2d('test',[1,13],"test")
   !call system("rm -rf tmp")
-
 end program plot_main

@@ -14,7 +14,7 @@ plot.o: plot.f08
 	$(f08comp) $(FCFLAGS) -c plot.f08
 # Cleaning everything
 clean:
-	rm -f *.o *.mod .dat
+	rm -f *.o *.mod *.dat
 clobber: clean
 	rm -f $(target)
 .PHONY: default clean cobbler

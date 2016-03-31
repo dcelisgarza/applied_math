@@ -7,13 +7,14 @@ program solar_system_main
   character(:), allocatable :: filename
   integer  :: i, nrec ! counter, number of records
   real(dp) :: t, dt, start, finish, rec! time, increment in time, start, finish, # steps per recording.
-  real(dp), allocatable :: ax(:,:)
+  real(dp), allocatable :: ax(:,:), max_ax(:,:), min_ax(:,:)
   real(dp):: dummy(12)
   real(4) :: maxrange(3), minrange(3)
   real(4) :: xrange(2), yrange(2), zrange(2)
   !type(titles), allocatable :: title(:)
-  !character(20) :: title(5)
-  character(:), allocatable :: title(:)
+  character(20) :: title(5)
+  real(4) :: onetick(1), twotick(2), threetick(3)
+  !character(:), allocatable :: title(:)
 
   dt = 1._dp
   start = 0._dp
@@ -38,23 +39,30 @@ program solar_system_main
   ! Calculating the range for the animation.
   nrec = nint(finish/(rec*dt)) + 1
   open(unit = 2, file = 'solar_system.dat', status = 'old', action = 'read', position = 'rewind')
-  allocate(ax(3,nrec))
+  allocate(ax(15,nrec), max_ax(3,5), min_ax(3,5))
   ranges: do i = 1, nrec
-    read(2,*) dummy, ax(:,i)
+    read(2,*) ax(:,i)
   !  read(2,*) dummy, ax
   end do ranges
-  minrange = minval(ax,dim=2)
-  maxrange = maxval(ax,dim=2)
+
+  min_ax = reshape(minval(ax,dim=2), [3,5])
+  max_ax = reshape(maxval(ax,dim=2), [3,5])
+  minrange = minval(min_ax,dim=2)!minval(ax,dim=2)
+  maxrange = maxval(max_ax,dim=2)!maxval(ax,dim=2)
   xrange = [minrange(1), maxrange(1)]
   yrange = [minrange(2), maxrange(2)]
-  zrange = [minrange(3)-0.01, maxrange(3)]
+  zrange = [minrange(3), maxrange(3)]
   close(2)
   ! Call gnuplot.
   call system('mkdir tmp')
   call pngterm('solar_system', plot_size=[800,800], font='Helvetica', font_size=12)
   call range(xrange,yrange,zrange)
-  call format('X, A.U.', 'Y, A.U.', 'Z, A.U.', 'Inner Solar System')
-  allocate( character(20) :: title(5) )
+  call plt_labels('X, A.U.', 'Y, A.U.', 'Z, A.U.', 'Inner Solar System')
+  onetick = 0.5
+  twotick = [-0.05,0.005]
+  threetick = [-0.05,0.01,0.05]
+  call ticks(xticks=onetick, mzticks=2)!,zticks,mxticks,myticks,mzticks)
+!  allocate( character(20) :: title(5) )
 !  allocate( character :: title(5)%title )
 
 

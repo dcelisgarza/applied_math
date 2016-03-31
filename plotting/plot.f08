@@ -164,7 +164,7 @@ subroutine epslatexterm(filename, plot_name, plot_size, plot_size_units)
   write(1,*) "set output '" // plot_name // ".tex'"
 end subroutine epslatexterm
 
-subroutine format(xlabel,ylabel,zlabel,title)
+subroutine plt_labels(xlabel,ylabel,zlabel,title)
   implicit none
   character(len=*), intent(in), optional :: xlabel, ylabel, zlabel, title
 
@@ -172,29 +172,7 @@ subroutine format(xlabel,ylabel,zlabel,title)
   if (present(ylabel) .eqv. .true.) write(1,*) "set ylabel '" // ylabel // "'"
   if (present(zlabel) .eqv. .true.) write(1,*) "set zlabel '" // zlabel // "'"
   if (present(title)  .eqv. .true.) write(1,*) "set title '"  // title  // "'"
-end subroutine format
-
-! For axis formats
-! fmt
-! if (present(fmt)    .eqv. .true.) write(1,*) "set format '" // fmt    // "'"
-
-subroutine ticks(xticks,yticks,zticks)
-  implicit none
-  real(4), intent(in), optional :: xticks(3), yticks(3), zticks(3)
-
-  if (present(xticks) .eqv. .true.) write(1,*) "set xtics ", xticks(1), ", ", xticks(2), ", ", xticks(3)
-  if (present(yticks) .eqv. .true.) write(1,*) "set ytics ", yticks(1), ", ", yticks(2), ", ", yticks(3)
-  if (present(zticks) .eqv. .true.) write(1,*) "set xtics ", zticks(1), ", ", zticks(2), ", ", zticks(3)
-end subroutine ticks
-
-subroutine range(xrange,yrange,zrange)
-  implicit none
-  real(4), intent(in), optional :: xrange(2), yrange(2), zrange(2)
-
-  if (present(xrange) .eqv. .true.) write(1,*) "set xrange [", xrange(1), ": ", xrange(2), "]"
-  if (present(yrange) .eqv. .true.) write(1,*) "set yrange [", yrange(1), ": ", yrange(2), "]"
-  if (present(zrange) .eqv. .true.) write(1,*) "set zrange [", zrange(1), ": ", zrange(2), "]"
-end subroutine range
+end subroutine plt_labels
 
 subroutine scale(xscale,yscale,zscale)
   implicit none
@@ -205,6 +183,119 @@ subroutine scale(xscale,yscale,zscale)
   if (present(zscale) .eqv. .true.) write(1,*) "set " // zscale
 end subroutine scale
 
+subroutine range(xrange,yrange,zrange)
+  implicit none
+  real(4), intent(in), optional :: xrange(2), yrange(2), zrange(2)
+
+  if (present(xrange) .eqv. .true.) write(1,*) "set xrange [", xrange(1), ": ", xrange(2), "]"
+  if (present(yrange) .eqv. .true.) write(1,*) "set yrange [", yrange(1), ": ", yrange(2), "]"
+  if (present(zrange) .eqv. .true.) write(1,*) "set zrange [", zrange(1), ": ", zrange(2), "]"
+end subroutine range
+
+! For axis formats
+! fmt
+! if (present(fmt)    .eqv. .true.) write(1,*) "set format '" // fmt    // "'"
+
+subroutine ticks(xticks,yticks,zticks,mxticks,myticks,mzticks)
+  implicit none
+  real(4), intent(in), optional :: xticks(:), yticks(:), zticks(:)
+  integer, intent(in), optional :: mxticks, myticks, mzticks
+
+  check_xtick: if (present(xticks) .eqv. .true.) then
+    if (size(xticks) > 3 .or. size(xticks) < 1) write(*,*) " Error:: plot.f08:: ticks: check_xtick: &
+                                                               1 <= size(xticks) <= 3, current size = ", size(xticks)
+    check_xsize: if (size(xticks) == 1) then
+      write(1,*) "set xtics " , xticks(1)
+    else if (size(xticks) == 2) then check_xsize
+      write(1,*) "set xtics " , xticks(1) , ", ", xticks(2)
+    else
+      write(1,*) "set xtics " , xticks(1) , ", ", xticks(2) , ", ", xticks(3)
+    endif check_xsize
+  endif check_xtick
+
+  check_ytick: if (present(yticks) .eqv. .true.) then
+    if (size(yticks) > 3 .or. size(yticks) < 1) write(*,*) " Error:: plot.f08:: ticks: check_xtick: &
+                                                               1 <= size(yticks) <= 3, current size = ", size(yticks)
+    check_ysize: if (size(yticks) == 1) then
+      write(1,*) "set ytics " , yticks(1)
+    else if (size(yticks) == 2) then
+      write(1,*) "set ytics " , yticks(1) , ", ", yticks(2)
+    else if (size(yticks) == 3) then check_ysize
+      write(1,*) "set ytics " , yticks(1) , ", ", yticks(2) , ", ", yticks(3)
+    endif check_ysize
+  endif check_ytick
+
+  check_ztick: if (present(zticks) .eqv. .true.) then
+    if (size(zticks) > 3 .or. size(zticks) < 1) write(*,*) " Error:: plot.f08:: ticks: check_xtick: &
+                                                               1 <= size(zticks) <= 3, current size = ", size(zticks)
+    check_zsize: if (size(zticks) == 1) then
+      write(1,*) "set ztics " , zticks(1)
+    else if (size(zticks) == 2) then
+      write(1,*) "set ztics " , zticks(1) , ", ", zticks(2)
+    else if (size(zticks) == 3) then check_zsize
+      write(1,*) "set ztics " , zticks(1) , ", ", zticks(2) , ", ", zticks(3)
+    endif check_zsize
+  endif check_ztick
+
+  if (present(mxticks) .eqv. .true.) write(1,*) "set mxtics ", mxticks
+  if (present(myticks) .eqv. .true.) write(1,*) "set mytics ", myticks
+  if (present(mzticks) .eqv. .true.) write(1,*) "set mztics ", mzticks
+end subroutine ticks
+
+subroutine grid(xticks,yticks,zticks,linestyle)
+  implicit none
+  ! Grid ticks := 1D Arrays of size 2.
+  ! [major, minor]
+  ! 0 = not using tick, 1 = using tick type.
+  ! E.g. [0,1] := not using major ticks, using minor ticks; [1,0] := using major ticks, not using minor ticks.
+  ! Line style := 1D array of size 6.
+  ! [xtick_ls, mxtick_ls, ytick_ls, mytick_ls, ztick_ls, mztick_ls]
+  ! 0 = not using line style (automatic)
+  integer, intent(in), optional :: xticks(2), yticks(2), zticks(2), linestyle(6)
+
+  check_xticks: if (present(xticks) .eqv. .true.) then
+    xtick_ls: if (xticks(1) == 1 .and. linestyle(1) /= 0) then
+      write(1,*) "set grid xtics ls ", linestyle(1)
+    else if (xticks(1) == 1 .and. linestyle(1) == 0) then xtick_ls
+      write(1,*) "set grid xtics"
+    end if xtick_ls
+
+    mxtick_ls: if (xticks(2) == 1 .and. linestyle(2) /= 0) then
+      write(1,*) "set grid mxtics ls ", linestyle(2)
+    else if (xticks(2) == 1 .and. linestyle(2) == 0) then mxtick_ls
+      write(1,*) "set grid mxtics"
+    end if mxtick_ls
+  end if check_xticks
+
+  check_yticks: if (present(yticks) .eqv. .true.) then
+    ytick_ls: if (yticks(1) == 1 .and. linestyle(3) /= 0) then
+      write(1,*) "set grid ytics ls ", linestyle(3)
+    else if (yticks(1) == 1 .and. linestyle(3) == 0) then ytick_ls
+      write(1,*) "set grid ytics"
+    end if ytick_ls
+
+    mytick_ls: if (yticks(2) == 1 .and. linestyle(4) /= 0) then
+      write(1,*) "set grid mytics ls ", linestyle(4)
+    else if (yticks(2) == 1 .and. linestyle(4) == 0) then mytick_ls
+      write(1,*) "set grid mytics"
+    end if mytick_ls
+  end if check_yticks
+
+  check_zticks: if (present(zticks) .eqv. .true.) then
+    ztick_ls: if (zticks(1) == 1 .and. linestyle(5) /= 0) then
+      write(1,*) "set grid ztics ls ", linestyle(5)
+    else if (zticks(1) == 1 .and. linestyle(5) == 0) then ztick_ls
+      write(1,*) "set grid ztics"
+    end if ztick_ls
+
+    mztick_ls: if (zticks(2) == 1 .and. linestyle(6) /= 0) then
+      write(1,*) "set grid mztics ls ", linestyle(6)
+    else if (zticks(2) == 1 .and. linestyle(6) == 0) then mztick_ls
+      write(1,*) "set grid mztics"
+    end if mztick_ls
+  end if check_zticks
+end subroutine grid
+
 subroutine linestyle(l, lc, lt, lw, pt, ps)
   implicit none
   integer, intent(in)                     :: l
@@ -212,7 +303,7 @@ subroutine linestyle(l, lc, lt, lw, pt, ps)
   integer, intent(in), optional           :: lt, pt
   real(4), intent(in), optional           :: lw, ps
 
-  write(1,*) " set style line", l, " \"
+  write(1,*) "set style line", l, " \"
   if (present(lc) .eqv. .true.) write(1,*) "lc " // lc // " \"
   if (present(lt) .eqv. .true.) write(1,*) "lt ", lt, " \"
   if (present(lw) .eqv. .true.) write(1,*) "lw ", lw, " \"
@@ -230,7 +321,7 @@ subroutine dplot2d(filename,using,nplots)
   dfilename = filename // ".dat"
 
   j = 0
-  write(1,*) " plot '" // dfilename // "' \"
+  write(1,*) "plot '" // dfilename // "' \"
   columns: if (present(using) .eqv. .true.) then
     plots_loop: do i = 1, nplots
       if (i > 1) write(1,*) ", '" // dfilename // "' \"
@@ -251,7 +342,7 @@ subroutine dplot3d(filename,using,nplots)
   dfilename = filename // ".dat"
 
   j = 0
-  write(1,*) " splot '" // dfilename // "' \"
+  write(1,*) "splot '" // dfilename // "' \"
   columns: if (present(using) .eqv. .true.) then
     plots_loop: do i = 1, nplots
       if (i > 1) write(1,*) ", '" // dfilename // "' \"
@@ -289,7 +380,7 @@ subroutine adplot3d(dfilename,pngname,interval,step,using,nplots,title)
   write(1,*) "n = n + 1"
   write(1,*) "set output sprintf('tmp/"//pngname//"%d.png',n)"
 
-  write(1,*) " splot '" // cdfilename // "' \"
+  write(1,*) "splot '" // cdfilename // "' \"
   columns: if (present(using) .eqv. .true.) then
     j = 0
     plots_loop: do i = 1, nplots
@@ -335,7 +426,7 @@ subroutine adplot2d(dfilename,pngname,interval,step,using,nplots)
   write(1,*) "n = n + 1"
   write(1,*) "set output sprintf('tmp/"//pngname//"%d.png',n)"
 
-  write(1,*) " splot '" // cdfilename // "' \"
+  write(1,*) "splot '" // cdfilename // "' \"
   columns: if (present(using) .eqv. .true.) then
     j = 0
     plots_loop: do i = 1, nplots
