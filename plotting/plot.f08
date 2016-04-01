@@ -83,6 +83,32 @@ subroutine pngterm(filename, plot_name, plot_size, font, font_size)
   if (present(plot_name) .eqv. .true.) write(1,*) "set output '" // plot_name // ".png'"
 end subroutine pngterm
 
+subroutine gifterm(filename, plot_name, plot_size, font, font_size)
+  implicit none
+  character(len=*), intent(in):: filename
+  character(len=*), intent(in), optional :: font, plot_name
+  integer, intent(in), optional          :: plot_size(2), font_size
+
+  open(unit = 1, file = filename//'.gnu')
+  write(1,*) "set terminal gif animate \"
+
+  write(1,*) "enhanced font \"
+
+  fnt: if (present(font) .eqv. .true.) then
+    write(1,*) "'" // font, ' \'
+    fnt_size: if (present(font_size) .eqv. .true.) then
+      write(1,*) ", ", font_size, " \"
+    end if fnt_size
+    write(1,*) "' \"
+  end if fnt
+
+  plt_size: if (present(plot_size) .eqv. .true.) then
+    write(1,*) "size ", plot_size(1), ", " , plot_size(2)
+  end if plt_size
+
+  if (present(plot_name) .eqv. .true.) write(1,*) "set output '" // plot_name // ".gif'"
+end subroutine gifterm
+
 subroutine svgterm(filename, plot_name, plot_size, font, font_size)
   implicit none
   character(len=*), intent(in):: filename, plot_name
@@ -192,6 +218,21 @@ subroutine range(xrange,yrange,zrange)
   if (present(zrange) .eqv. .true.) write(1,*) "set zrange [", zrange(1), ": ", zrange(2), "]"
 end subroutine range
 
+subroutine linestyle(l, lc, lt, lw, pt, ps)
+  implicit none
+  integer, intent(in)                     :: l
+  character(len=*), intent(in), optional  :: lc
+  integer, intent(in), optional           :: lt, pt
+  real(4), intent(in), optional           :: lw, ps
+
+  write(1,*) "set style line", l, " \"
+  if (present(lc) .eqv. .true.) write(1,*) "lc " // lc // " \"
+  if (present(lt) .eqv. .true.) write(1,*) "lt ", lt, " \"
+  if (present(lw) .eqv. .true.) write(1,*) "lw ", lw, " \"
+  if (present(pt) .eqv. .true.) write(1,*) "pt ", pt, " \"
+  if (present(pt) .eqv. .true.) write(1,*) "ps ", ps
+end subroutine linestyle
+
 ! For axis formats
 ! fmt
 ! if (present(fmt)    .eqv. .true.) write(1,*) "set format '" // fmt    // "'"
@@ -251,7 +292,8 @@ subroutine grid(xticks,yticks,zticks,linestyle)
   ! Line style := 1D array of size 6.
   ! [xtick_ls, mxtick_ls, ytick_ls, mytick_ls, ztick_ls, mztick_ls]
   ! 0 = not using line style (automatic)
-  integer, intent(in), optional :: xticks(2), yticks(2), zticks(2), linestyle(6)
+  integer, intent(in), optional :: xticks(2), yticks(2), zticks(2)
+  integer, intent(in)           :: linestyle(6)
 
   check_xticks: if (present(xticks) .eqv. .true.) then
     xtick_ls: if (xticks(1) == 1 .and. linestyle(1) /= 0) then
@@ -296,20 +338,12 @@ subroutine grid(xticks,yticks,zticks,linestyle)
   end if check_zticks
 end subroutine grid
 
-subroutine linestyle(l, lc, lt, lw, pt, ps)
+subroutine xyplane(zvalue)
   implicit none
-  integer, intent(in)                     :: l
-  character(len=*), intent(in), optional  :: lc
-  integer, intent(in), optional           :: lt, pt
-  real(4), intent(in), optional           :: lw, ps
+  real(4), intent(in) :: zvalue
 
-  write(1,*) "set style line", l, " \"
-  if (present(lc) .eqv. .true.) write(1,*) "lc " // lc // " \"
-  if (present(lt) .eqv. .true.) write(1,*) "lt ", lt, " \"
-  if (present(lw) .eqv. .true.) write(1,*) "lw ", lw, " \"
-  if (present(pt) .eqv. .true.) write(1,*) "pt ", pt, " \"
-  if (present(pt) .eqv. .true.) write(1,*) "ps ", ps
-end subroutine linestyle
+  write(1,*) "set xyplane at", zvalue
+end subroutine xyplane
 
 subroutine dplot2d(filename,using,nplots)
   implicit none
@@ -398,6 +432,7 @@ subroutine adplot3d(dfilename,pngname,interval,step,using,nplots,title)
     write(1,*) ", '"// cdfilename //" every ::i::i w p ls 1 \"
   end if columns
   write(1,*) "}"
+  close(1)
 end subroutine adplot3d
 
 subroutine adplot2d(dfilename,pngname,interval,step,using,nplots)
