@@ -1,0 +1,41 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{fontspec}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage[left=1.00in, right=1.00in, top=1.00in, bottom=1.00in]{geometry}
+\usepackage{lmodern}
+
+\usepackage{minted}
+\title{Ordinary Differential Integrators}
+\author{Daniel Celis Garza}
+\date{\today}
+\newfontfamily\ubuntumono{Ubuntu Mono}
+\begin{document}
+	\maketitle
+
+	\section{Directory Tree}
+		{\ubuntumono ./applied\textunderscore math/ode\textunderscore int}
+
+	\section{Dependencies}
+		\texttt{nrtype.f08}
+	
+	\section{Subroutines}
+		\subsection{Runge-Kutta-Gill Integrator (RK45)}
+			\mint{fortran}|call rk4g(derivs, x, yi, yf, h)|
+			\subsubsection{Arguments}
+				\inputminted[firstline=6, lastline=45]{fortran}{../ode_int.f08}
+		\subsection{Runge-Kutta Cash-Karp Integrator (RKCK)}
+			\mint{fortran}|call rkck(derivs, x, yi, yf, er, h)|
+			\subsubsection{Arguments}
+				\inputminted[firstline=67, lastline=123]{fortran}{../ode_int.f08}
+		\subsection{Adaptive Runge-Kutta Cash-Karp Integrator (RKCKA)}
+			\mint{fortran}|call rkcka(derivs, x, y, der, h, hmin)|
+			\subsubsection{Arguments}
+				\inputminted[firstline=249, lastline=282]{fortran}{../ode_int.f08}
+		\subsection{Basic Verlet}
+			\mint{fortran}|call basic_verlet(derivs, x, yi, yf, h)|
+			\subsubsection{Arguments}
+				\inputminted[firstline=295, lastline=328]{fortran}{../ode_int.f08}
+\end{document}
