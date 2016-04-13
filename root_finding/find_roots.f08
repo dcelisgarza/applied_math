@@ -106,7 +106,7 @@ contains
     fc = func(c)
 
     bisecting: do i = 1, max_it
-      c  = .5*(a+b)
+      c  = .5_dp*(a+b)
       fc = func(c)
       if ( fc == 0._dp .or. .5_dp*(b - a) < tol) exit bisecting
       check_sign: if ( fc * fa < 0._dp ) then
@@ -122,6 +122,5 @@ contains
     else found_root
       root = c
     end if found_root
-
   end subroutine bisection
 end module find_roots

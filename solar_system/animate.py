@@ -8,7 +8,7 @@ import matplotlib.animation as anm
 #plt.rcParams['animation.ffmpeg_path'] = '/usr/bin/ffmpeg'
 plt.close('all')
 data = np.loadtxt('solar_system.dat')
-data2 = data[:,15:30]
+data2 = data[:,0:15]
 
 fig = plt.figure()
 ax = p3.Axes3D(fig)

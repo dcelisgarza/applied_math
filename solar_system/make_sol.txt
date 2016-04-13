@@ -22,7 +22,7 @@ solar_system_main.o: solar_system_main.f08
 	$(f08comp) $(FCFLAGS) -c solar_system_main.f08
 # Cleaning everything
 clean:
-	rm -f *.o *.mod *.dat *.mp4 *.gnu *.gif
+	rm -f *.o *.mod *.dat *.gnu *.gif
 clobber: clean
 	rm -f $(target)
 .PHONY: default clean cobbler

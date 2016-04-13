@@ -101,7 +101,5 @@ program solar_system_main
   call system('ffmpeg -i tmp/isolar_system%d.png isolar_system.mp4')
   !call system('ffmpeg -i tmp/osolar_system%d.png osolar_system.mp4')
   call system('rm -rf tmp')
-  call system ('make -f make_sol.txt clean')
-
 
 end program solar_system_main
