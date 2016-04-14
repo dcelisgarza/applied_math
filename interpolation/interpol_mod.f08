@@ -128,10 +128,9 @@ contains
       end do nev_loop
   end subroutine rinex
 
-  subroutine cspline(xi,yi,y,dydx1,dydx2)
+  subroutine csplinec(xi,yi,dydx1,dydx2,y)
     !===============================================!
     ! Cubic spline                                  !
-    ! Runge-Kutta 4 Gill's method                   !
     ! Daniel Celis Garza 9 Apr. 2016                !
     !-----------------------------------------------!
     ! Inputs:                                       !
@@ -157,7 +156,7 @@ contains
     integer                        :: n
 
     check_size: if (size(xi) /= size(yi) .or. size(xi) /= size(y)) then
-      print*, " Error: subr: cspline: check_size: sizes of xi, yi and y arrays must be the same."
+      print*, " Error: subr: csplinec: check_size: sizes of xi, yi and y arrays must be the same. "
       return
     end if check_size
 
@@ -209,15 +208,50 @@ contains
     ! If the Lower Boundary Condition (LBC) is not present.
     lbc: if (present(dydx1) .eqv. .false.) then
       ! If there is no LBC, it is set to the natural value.
-      a(1) = 0._dp
-      b(1) = 0._dp
+      a(n) = 0._dp
+      b(n) = 0._dp
     else lbc
       ! Else, it is set to a specified first derivative.
-      c(1) = 0.5_dp
-      b(1) = ( - 3._dp / ( xi(n) - x(n - 1) ) ) * ( ( yi(n) - yi(n - 1) ) / ( xi(n) - xi(n - 1) ) - dydx2 )
+      c(n) = 0.5_dp
+      b(n) = ( - 3._dp / ( xi(n) - x(n - 1) ) ) * ( ( yi(n) - yi(n - 1) ) / ( xi(n) - xi(n - 1) ) - dydx2 )
     end if lbc
 
     ! Call subroutine to solve tridiagonal matrix.
-     call tridiag(d(2: n), c, a(1: n - 1), b, y)
-  end subroutine cspline
+     call tridiag(c(2: n), c, a(1: n - 1), b, y)
+  end subroutine csplinec
+
+  subroutine csplnei(xi, yi, yi2, x, y)
+    implicit none
+    real(dp), intent(in)  :: x, xi(:), yi(:), yi2(:)
+    real(dp), intent(out) :: y
+    real(dp) :: h, a, b
+    integer  :: n, oidx, nixd
+
+    ! Set the value of n to be the number of dots to interpolate.
+    n = size(xi)
+    ! Check that the sizes of all arrays involved are the same.
+    check_size: if ( n /= size(yi) .or. &
+                     n /= size(yi2) ) then
+      print*, " Error: subr: csplinei: check_size: sizes of xi, yi and yi2 arrays must be the same; size(xi) = ", n, "; size(yi) = ", size(yi), "; size(yi2) = ", size(yi2)
+      return
+    end if check_size
+
+    ! TO DO:
+    ! find the interval to be spanned
+    ! bisection to find the interval
+    ! how to do that no idea
+    ! things to do with oidx and nidx
+
+    ! Calculate the interval.
+    h = xi( nidx ) - xi( oidx )
+    ! Check if h is zero.
+    if ( h == 0._dp ) write(*,*) " Error: subr: csplinei: h is too small, wrong values of xi; h = ", h, "; x(nidx) = " xi(nidx), "; x(oidx) = ", xi(oidx)
+
+    a = ( x - xi( oidx ) ) / h
+    b = ( x( nixd ) - x  ) / h
+
+    ! CHECK THIS CALCULATION YA NUMTY.
+    y = a * yi(oidx) + b * yi(nidx) + ( ( a*a*a - a ) * yi2() )
+
+  end subroutine csplnei
 end module interpolation
