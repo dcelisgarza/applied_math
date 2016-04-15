@@ -34,24 +34,30 @@ contains
     ! Check that the sizes of the lower, main and upper diagonals make sense.
     check_size: if( n /= size(c) + 1 .or. &
                     n /= size(b) + 1 .or. &
-                    n /= size(y)             ) then
+                    n /= size(y)            ) then
       write(*,*) " Error: lin_alg: tridiag: check_size: Sizes of the upper and lower diagonals must be one smaller than the main &
                    diagonal; size(lower_diagonal) = ", size(c), "; size(upper_diagonal) = ", size(b), &
                    "; size(main_diagonal) = ", size(a)
     end if check_size
 
-    ! Calculate the first denominator.
-    den  = a(1)
-    if ( den == 0._dp ) write(*,*) " Error: lin_alg: tridiag: dfs: Next iteration will divide by zero. den = ", den
+    ! Calculate the First Denominator.
+    den = a(1)
+    fd: if ( den == 0._dp ) then
+      write(*,*) " Error: lin_alg: tridiag: Next iteration will divide by zero. den = ", den
+      stop
+    end if fd
     ! Calculate preliminary value of x(1).
     x(1) = y(1) / den
 
     ! Decomposition and Forward Substitution.
     dfs: do i = 2, n
       w(i) = b(i - 1) / den
-      den = a(i) - c(i - 1) * w(i)
-      ! Error if next iteration will divide by zero.
-      if ( den == 0._dp ) write(*,*) " Error: lin_alg: tridiag: dfs: Next iteration will divide by zero. den = ", den
+      den  = a(i) - c(i - 1) * w(i)
+      ! Error if Next Iteration will Divide by 0.
+      nid0: if ( den == 0._dp ) then
+        write(*,*) " Error: lin_alg: tridiag: dfs: Next iteration will divide by zero. den = ", den
+        stop
+      end if nid0
       ! x(2) = ( y(2) - c(1) * x(1) ) /
       ! Solution vector.
       x(i) = ( y(i) - c(i - 1) * x(i - 1) ) / den

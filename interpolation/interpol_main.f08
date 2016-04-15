@@ -3,7 +3,7 @@ program interpol_main
   use interpolation
   implicit none
   real(dp) :: y, dy, x
-  real(dp) :: xi(6), yi(6), yi2(6)
+  real(dp) :: xi(6), yi(6), yi2(6), yi3(6), yi4(6)
   integer :: i
 
   x  = -5._dp
@@ -12,8 +12,14 @@ program interpol_main
 
   yi2 = rational(xi)
 
+  call csplinec(xi,yi,yi3)
+  call csplinec(xi,yi,yi4)
+
   open(unit = 1, file = "poly_int.dat")
   open(unit = 2, file = "rat_int.dat")
+  open(unit = 3, file = "cspline_int.dat")
+  open(unit = 4, file = "cspline_rat_int.dat")
+
   do while (x < 9.3_dp)
     call pinex(xi,yi,x,y,dy)
     write(1,*) x, y
@@ -21,9 +27,15 @@ program interpol_main
     call rinex(xi,yi2,x,y,dy)
     write(2,*) x, y, rational(x)
 
+    call csplnei(xi, yi, yi3, x, y)
+    write(3,*) x, y
+
+    call csplnei(xi, yi2, yi4, x, y)
+    write(4,*) x, y
+
     x = x + 0.1_dp
   end do
-  close(1); close(2)
+  close(1); close(2); close(3); close(4)
 
 
 
