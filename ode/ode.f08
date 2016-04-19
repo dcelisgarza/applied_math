@@ -1,4 +1,4 @@
-module ode_int
+module ode
   use nrtype
   implicit none
 contains
@@ -18,14 +18,14 @@ contains
     ! x      = independent variable @ step i                  !
     ! yi()   = array of dependent variables @ step i          !
     !---------------------------------------------------------!
+    ! Outputs:                                                !
+    ! yf() = array of dependent variables @ step i+1          !
+    !---------------------------------------------------------!
     ! Locals:                                                 !
     ! ys() = array of dependent variables @ stage s of step i !
     ! ki() = array of Runge-Kutta k/h                         !
     ! ho2  = h/2                                              !
     ! ci   = Butcher table parameters                         !
-    !---------------------------------------------------------!
-    ! Outputs:                                                !
-    ! yf() = array of dependent variables @ step i+1          !
     !=========================================================!
     implicit none
     real(dp), intent(in)          :: x, h, yi(:)
@@ -79,6 +79,10 @@ contains
     ! x      = independent variable @ step i                  !
     ! yi()   = array of dependent variables @ step i          !
     !---------------------------------------------------------!
+    ! Outputs:                                                !
+    ! yf() = array of dependent variables @ step i+1          !
+    ! er() = array of integration errors                      !
+    !---------------------------------------------------------!
     ! Locals:                                                 !
     ! ys() = array of dependent variables @ stage s of step i !
     ! ki() = array of Runge-Kutta k/h                         !
@@ -86,10 +90,6 @@ contains
     ! aij  = Butcher Table A-matrix                           !
     ! bi   = Butcher Table b-vector                           !
     ! dbi  = b-b* vector difference for error calculation     !
-    !---------------------------------------------------------!
-    ! Outputs:                                                !
-    ! yf() = array of dependent variables @ step i+1          !
-    ! er() = array of integration errors                      !
     !=========================================================!
     implicit none
     real(dp), intent(in)          :: x, yi(:), h
@@ -349,4 +349,4 @@ contains
     yf(n_coords + 1: n_derivs) = yi(n_coords + 1 : n_derivs) + 0.5_dp * (dydxs + dydx) * h
 
   end subroutine velocity_verlet
-end module ode_int
+end module ode

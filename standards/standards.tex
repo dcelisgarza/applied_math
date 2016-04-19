@@ -1,0 +1,136 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage{fontspec}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{lmodern}
+\usepackage{minted}
+\usepackage{booktabs}
+\usepackage{paralist}
+\usepackage[left=1.00in, right=1.00in, top=1.00in, bottom=1.00in]{geometry}
+\title{Code Standards}
+\author{Daniel Celis Garza}
+\date{\today}
+%\newcommand{\lfort}[1]{\mint{fortran}|#1|}
+\begin{document}
+	%
+	\maketitle
+	\section{Introduction}
+	Documenting coding standards.
+	%
+	\section{General Practices}
+	%
+	\emph{Always} use \texttt{implicit none} before any variable declaration. Include only what will be used in the code via \texttt{use <modue\textunderscore name>, only : <list>}.
+	
+	Use spaces to clearly denote what is going on in the code. Try not to use \texttt{**} if elevating to a low integer power. Should \texttt{**} become necessary, do not add spaces between them. Use line breaks to improve the code's readability. Align similar lines of code to make the code neater.
+	
+	Modularise code and make subroutines as general as possible.
+	\section{Files}
+	%
+		\subsection{Makefile}
+		%
+			Makefiles should start with \texttt{make\textunderscore} followed by the main file's name. They should have, \emph{at minimum}, the following flags: array bounds, unused variables \& unallocated variables. Comments should be used to explain what each file and flag is needed/used for.
+		%
+		\subsection{Main}
+		%
+		Main filenames must be as clear and short as possible, where clarity $\gg$ length. Use the following naming structure: \texttt{<project>\textunderscore main}. The extension must be \texttt{.out} for Unix systems and \texttt{.exe} for Windows. It should only contain calls to other subroutines and functions.
+		%
+		\subsection{Modules and Sub-modules}
+		%
+		Do \emph{NOT} use global variables and/or parameters unless \emph{completely} necessary. Global parameters and variables have a tendency to bite one in the ass when one least expects it. If they seem necessary, such as in the case of user-defined parameters, use a module to read and store them so they become global variables defined at runtime.
+		
+		Modules and submodules should be named under the same scheme as main files, without the underscore and what follows it, after the underscore.
+		
+		Limit a module's scope to a specific purpose.
+		%
+		\subsection{Data}
+		%
+		Data filenames should use the either of the following naming structures: \texttt{<project>.dat} or \texttt{<project>\textunderscore <parameters>.dat}.
+		
+		The top line of the data file should contain a short commented description of the file structure and purpose. Whenever possible, the column print order should be:
+		\begin{table}
+			\centering
+			\caption{Data file print order.}
+			\label{t:dfpo}
+			\begin{tabular}{cc}
+			\toprule
+			Independent Vars & Dependent Vars \\
+			\midrule
+			$ x_{1 \ldots n} $ & $ \dfrac{\mathrm{d}^{0 \ldots k} }{\mathrm{d} x_{1 \ldots n}^{0\ldots k}} f_{1 \ldots m}(x_{1 \ldots n}) $ \\
+			\bottomrule
+			\end{tabular}
+		\end{table}
+	%
+	\section{Variables and Arguments}
+	%
+	Should a subroutine or function be used as an argument of another function or subroutine, make interfaces explicit. Use derived types, pointers and allocatable variables
+	
+	Variable and subroutine names should make it clear what they mean, pointers should start with \texttt{p\textunderscore}. The same principle applies as in naming files. They should be declared by type with kind in ascending order:
+	\begin{inparaenum}[\itshape 1\upshape )]
+		\item Scalar,
+		\item Array,
+		\item Coarray,
+		\item Optional,
+		\item Derived,
+		\item Pointer,
+		\item Allocatable;
+	\end{inparaenum}
+	and intent: 
+	\begin{inparaenum}[\itshape 1\upshape )]
+		\item \texttt{intent(in)},
+		\item \texttt{intent(out)},
+		\item \texttt{intent(inout)},
+		\item locals, and
+		\item \texttt{parameter}.
+	\end{inparaenum}
+	%
+	\section{Intent}
+	%
+	\texttt{intent()} must always be declared within functions and subroutines. 
+	%
+	\section{Functions and Subroutines}
+	%
+	Aforementioned principles apply to their naming conventions.
+	%
+		\subsection{Elemental}
+		%
+		Elemental functions \& subroutines should start their name with \texttt{elmt\textunderscore}.
+		%
+		\subsection{Recursive}
+		%
+		Recursive functions \& subroutines should start their name with \texttt{rcsv\textunderscore}.
+		%
+		\subsection{Elemental Recursive}
+		%
+		Elemental functions \& recursive subroutines should start their names with \texttt{rcel\textunderscore}.
+		%
+	%
+	\section{Comments and Labels}
+	%
+	Comments should be used to explain the reasoning behind logical blocks. Expanded comments should be used whenever a non-trivial procedure is being carried out.
+	
+	Every loop, if and case block must be labeled with a logical label made up of the initial letters of the block's main purpose as delineated by the comment explaining its function.
+	
+	Subroutines and functions purpose and variables must be documented before \texttt{implicit none}. These comments must have the a structure similar to the following:
+	\pagebreak
+	\begin{minted}{fortran}
+    !=======================!
+    ! Short explanation.    !
+    ! Method used.          !
+    ! Author & date         !
+    !-----------------------!
+    ! Extended explanation. !
+    !-----------------------!
+    ! Inputs:               !
+    ! scalar  = explanation !
+    ! array() = explanation !
+    !-----------------------!
+    ! Outputs:              !
+    !-----------------------!
+    ! Inputs-Outputs:       !
+    !-----------------------!
+    ! Locals:               !
+    !=======================!
+	\end{minted}
+\end{document}

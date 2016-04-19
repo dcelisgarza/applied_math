@@ -1,7 +1,7 @@
 program ode_main
   use nrtype
   use derivatives
-  use ode_int
+  use ode, only : basic_verlet, velocity_verlet
   implicit none
   real(dp) :: dvdt, t, xo(1), xn(1), h, vo, xov(2), xnv(2)
 
