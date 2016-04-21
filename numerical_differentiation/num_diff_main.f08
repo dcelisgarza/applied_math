@@ -8,7 +8,6 @@ program num_diff_main
   integer, allocatable :: coefs(:)
 
   open(unit=1, file = 'test_numdif.dat')
-
   !do i = 0._dp, tau, 0.01_dp
   !  write(1,*) i, sin(i), cos(i),sifodi1(sine,i,0.0001_dp), (cos(i)-sifodi1(sine,i,0.01_dp))*100._dp &
   !  ,eicedi1(sine,i,0.01_dp), (cos(i)-sifodi1(sine,i,0.01_dp))*100._dp
@@ -17,15 +16,22 @@ program num_diff_main
 
   call cpu_time(start)
 
-  allocate(coefs(2))
-  coefs = dncoef1(1)
+  !allocate(coefs(4))
+  !coefs = dncoef1(3)
 
-  print*, coefs
 
-  do i = 0._dp, tau, 0.01_dp
-    write(1,*) i, cos(i)-fdo1(sine, i, 0.01_dp, coefs)
-  end do
-  !print*, dncoef1(1), finish-start
+  !do i = 0._dp, tau, 0.01_dp
+  !  write(1,*) i, fdo1(sine, i, 0.01_dp, coefs), bdo1(sine, i, 0.01_dp, coefs), cdo1(sine, i, 0.01_dp, coefs)
+  !end do
+
+  !deallocate(coefs)
+  aux = 0.
+  allocate(coefs(3))
+  coefs = dncoefn(1,2)
+  print*, aux,aux,aux, dncoef1(1)
+  print*, aux,aux,-dncoef1(2)/2
+  print*, aux, dncoef1(3)/3
+  print*, -dncoef1(4)/4
 
 contains
     function sine(x)
