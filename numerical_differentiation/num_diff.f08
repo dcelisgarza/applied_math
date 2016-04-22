@@ -60,11 +60,11 @@ contains
 
     ! Calculate the Coefficients.
     cc: do i = 0, n
-      dncoef1(i+1) = (-1)**i * float(rcsv_bicoef(n,i))
+      dncoef1(i+1) = (-1)**i * rcsv_bicoef(n,i)
     end do cc
   end function dncoef1
 
-  function dncoefn(n,k)
+  function dncoefn(n,k) result(rdncoefn)
     ! TO DO:
     ! Make this a recursive function or a loop.
 
@@ -74,25 +74,58 @@ contains
     ! https://en.wikipedia.org/wiki/Finite_difference_coefficient
     ! https://en.wikipedia.org/wiki/Taylor_series
     implicit none
-    integer, intent(in) :: n, k
-    real(dp)            :: dncoefn(n+k), dkcoefk(n+k+2)
-    integer :: c
-
-    if ( k < n ) write(*,*) " Error: dncoefn: k must be greater than n, k = ", k, " n = ", n
-
-    ! Calculate the difference between the order of the error and order of the derivative.
-    c = k - n
+    integer, intent(in)   :: n, k
+    real(dp), allocatable :: rdncoefn(:)!dncoefn(n+k), dkcoefk(n+k+2)
+    integer :: i, j, c
 
     ! Calculate the coefficients for the n'th derivative.
-    dkcoefk(1:n+1) = dncoef1(n)
+    c = k - n
+    ! Allocate rdncoefn according to sizes of k and n
+    alloc: if (c > 0) then
+      if (.not. allocated(rdncoefn)) allocate(rdncoefn(k+1))
+    else alloc
+      if (.not. allocated(rdncoefn)) allocate(rdncoefn(n+1))
+    end if alloc
+
+    ! Check if k = 1, if it is go to the calculation of the terms of the n'th derivative with 1st order errros.
+    rdncoefn = 0._dp
+    keq1: if (k /= 1) then
+      ! Check wheter k > n.
+      if (c > 0) then
+        ! Loop through the Finite Difference Coefficients for the Error term.
+        fdce: do j = k, n+1, -1
+          rdncoefn(k-j+1:k) = rdncoefn(k-j+1:k) + (-1)**(j-1) * dncoef1(j) / j
+        end do fdce
+      end if
+    end if keq1
+
+
+    ! Check which is Greater Order of derv or Error of derivative.
+    goe: if (c > 0) then
+      ! k > n
+      rdncoefn(1+c:k+1) = rdncoefn(1+c:k+1) + dncoef1(n)
+    else goe
+      rdncoefn(1:n+1) = rdncoefn(1:n+1) + dncoef1(n)
+    end if goe
+
+
+
+
+    !if ( k < n ) write(*,*) " Error: dncoefn: k must be greater than n, k = ", k, " n = ", n
+
+    ! Calculate the difference between the order of the error and order of the derivative.
+    !c = k - n
+
+    ! Calculate the coefficients for the n'th derivative.
+    !dkcoefk(1:n+1) = dncoef1(n)
     !print*, dkcoefk(1:n+1)
 
     ! Calculate the coefficients for the k'th order error.
-    dkcoefk(n+2:n+k+2) = - dncoef1(k) / k
+    !dkcoefk(n+2:n+k+2) = - dncoef1(k) / k
 
     ! Map coefficients.
-    dncoefn(1:c)     = dkcoefk(n+2:n+1+c)
-    dncoefn(c+1:n+k) = dkcoefk(1:n+1) + dkcoefk(n+2+c:n+k+2)
+    !dncoefn(1:c)     = dkcoefk(n+2:n+1+c)
+    !dncoefn(c+1:n+k) = dkcoefk(1:n+1) + dkcoefk(n+2+c:n+k+2)
 
   end function dncoefn
 

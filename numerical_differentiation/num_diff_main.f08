@@ -26,12 +26,21 @@ program num_diff_main
 
   !deallocate(coefs)
   aux = 0.
-  allocate(coefs(3))
-  coefs = dncoefn(1,2)
-  print*, aux,aux,aux, dncoef1(1)
-  print*, aux,aux,-dncoef1(2)/2
-  print*, aux, dncoef1(3)/3
-  print*, -dncoef1(4)/4
+  !allocate(coefs(3))
+  !coefs = dncoefn(1,2)
+  !print*, aux,aux,aux,aux, dncoef1(1)
+  !print*, aux,aux,aux,-dncoef1(2)/2
+  !print*, aux,aux, dncoef1(3)/3
+  !print*, aux,-dncoef1(4)/4
+  !print*, dncoef1(5)/5
+  !print*, "--------"
+  print*, aux,aux, aux, dncoef1(2)
+  print*, aux,aux, -dncoef1(3)
+  print*, aux, dncoef1(4)
+  print*, dncoef1(5)
+  print*, dncoef1(6)
+  !print*, dncoefn(2,3)
+
 
 contains
     function sine(x)
