@@ -16,16 +16,15 @@ program num_diff_main
 
   call cpu_time(start)
 
-  !allocate(coefs(4))
-  !coefs = dncoef1(3)
+  allocate(coefs(3))
+  coefs = dncoef1(2)
 
-
-  !do i = 0._dp, tau, 0.01_dp
-  !  write(1,*) i, fdo1(sine, i, 0.01_dp, coefs), bdo1(sine, i, 0.01_dp, coefs), cdo1(sine, i, 0.01_dp, coefs)
-  !end do
+  do i = 0._dp, tau, 0.01_dp
+    write(1,*) i, fdo1(sine, i, 0.01_dp, coefs), bdo1(sine, i, 0.01_dp, coefs), cdo1(sine, i, 0.01_dp, coefs)
+  end do
 
   !deallocate(coefs)
-  aux = 0.
+  !aux = 0.
   !allocate(coefs(3))
   !coefs = dncoefn(1,2)
   !print*, aux,aux,aux,aux, dncoef1(1)
@@ -34,12 +33,13 @@ program num_diff_main
   !print*, aux,-dncoef1(4)/4
   !print*, dncoef1(5)/5
   !print*, "--------"
-  print*, aux,aux, aux, dncoef1(2)
-  print*, aux,aux, -dncoef1(3)
-  print*, aux, dncoef1(4)
-  print*, dncoef1(5)
-  print*, dncoef1(6)
+!  print*, aux,aux, aux, dncoef1(2)
+!  print*, aux,aux, -dncoef1(3)
+!  print*, aux, dncoef1(4)
+!  print*, dncoef1(5)
+!  print*, dncoef1(6)
   !print*, dncoefn(2,3)
+  print*, dncoefn(2, 4, [0._dp,1._dp,2._dp,3._dp,4._dp], 0._dp)
 
 
 contains

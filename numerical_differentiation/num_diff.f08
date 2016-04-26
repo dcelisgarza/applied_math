@@ -60,74 +60,73 @@ contains
 
     ! Calculate the Coefficients.
     cc: do i = 0, n
-      dncoef1(i+1) = (-1)**i * rcsv_bicoef(n,i)
+      dncoef1(n+1-i) = (-1)**i * rcsv_bicoef(n,i)
     end do cc
   end function dncoef1
 
-  function dncoefn(n,k) result(rdncoefn)
-    ! TO DO:
-    ! Make this a recursive function or a loop.
-
-
-    ! Coefficients for n'th order derivatives with k'th order errors for forward and backward, 2k'th order errors for central differences
-    ! https://en.wikipedia.org/wiki/Finite_difference
-    ! https://en.wikipedia.org/wiki/Finite_difference_coefficient
-    ! https://en.wikipedia.org/wiki/Taylor_series
+  function dncoefn(m, n, a, xi) result(rdncoefn)
+    ! n = order of the derivative.
+    ! k = number of grid points (h-steps)
+    ! xi
+    ! rdncoefn = array of coefficients of nth order with k - n + 1 order of accuracy
+    ! http://www.ams.org/journals/mcom/1988-51-184/S0025-5718-1988-0935077-0/S0025-5718-1988-0935077-0.pdf
     implicit none
-    integer, intent(in)   :: n, k
-    real(dp), allocatable :: rdncoefn(:)!dncoefn(n+k), dkcoefk(n+k+2)
-    integer :: i, j, c
+    integer, intent(in)            :: m, n
+    real(dp), intent(in)           :: xi, a(0:n)
+    !real(dp), optional             :: xi
+    real(dp)                       :: rdncoefn(0:n)
+    integer  :: sn, nu, sm
+    real(dp) :: c1, c2, c3
+    real(dp) :: d(0:m,0:n,0:n)
 
-    ! Calculate the coefficients for the n'th derivative.
-    c = k - n
-    ! Allocate rdncoefn according to sizes of k and n
-    alloc: if (c > 0) then
-      if (.not. allocated(rdncoefn)) allocate(rdncoefn(k+1))
-    else alloc
-      if (.not. allocated(rdncoefn)) allocate(rdncoefn(n+1))
-    end if alloc
+    ! Check whether we give xi, if not default to xi = 0
+    !if(.not. present(xi)) xi = 0._dp
 
-    ! Check if k = 1, if it is go to the calculation of the terms of the n'th derivative with 1st order errros.
-    rdncoefn = 0._dp
-    keq1: if (k /= 1) then
-      ! Check wheter k > n.
-      if (c > 0) then
-        ! Loop through the Finite Difference Coefficients for the Error term.
-        fdce: do j = k, n+1, -1
-          rdncoefn(k-j+1:k) = rdncoefn(k-j+1:k) + (-1)**(j-1) * dncoef1(j) / j
-        end do fdce
-      end if
-    end if keq1
+    ! Check array size.
+    !check_size: if( size(a) /= size(rdncoefn) .or. size(a) /= m + 1 ) then
+    !  write(*,*) " Error: num_diff: dncoefn: check_size: Grid size and the size of the coefficient table are not equal to n + 1. &
+    !               size(grid) = ", size(a), " size(rdncoefn) = ", size(rdncoefn), " n + 1 = ", n + 1
+    ! return
+    !end if check_size
+    d = 0._dp
+    d(0,0,0)  = 1._dp
+    c1 = 1._dp
 
+    ! Loop Over Derivatives.
+    od: do sn = 1, n
 
-    ! Check which is Greater Order of derv or Error of derivative.
-    goe: if (c > 0) then
-      ! k > n
-      rdncoefn(1+c:k+1) = rdncoefn(1+c:k+1) + dncoef1(n)
-    else goe
-      rdncoefn(1:n+1) = rdncoefn(1:n+1) + dncoef1(n)
-    end if goe
+      c2 = 1._dp
 
+      ! Loop Over H-Steps.
+      ohs: do nu = 0, sn - 1
+        c3 = a(sn) - a(nu)
+        c2 = c2 * c3
 
+        ! Inner loop Over Derivatives.
+        iod: do sm = 0, minval([sn, m])
+          ! Prevent Memory Dump
+          pmd1: if( sm /= 0 ) then
+            d(sm, sn, nu) = ( a(sn) - xi ) * d(sm,sn-1,nu) - sm * d(sm-1,sn-1,nu)
+          else pmd1
+            d(sm, sn, nu) = ( a(sn) - xi ) * d(sm,sn-1,nu)
+          end if pmd1
+          d(sm, sn, nu) = d(sm, sn, nu) / c3
+        end do iod
+      end do ohs
 
+      ! loop over derivatives
+      do sm = 0, minval([sn,m])
+        pmd2: if ( sm /= 0 ) then
+          d(sm, sn, sn) = c1/c2 * ( sm * d(sm-1,sn-1,sn-1) - (a(sn-1) - xi) *   d(sm,sn-1,sn-1) )
+        else pmd2
+          d(sm, sn, sn) = -c1/c2 * (a(sn-1) - xi) *   d(sm,sn-1,sn-1)
+        end if pmd2
+      end do
+      c1 = c2
 
-    !if ( k < n ) write(*,*) " Error: dncoefn: k must be greater than n, k = ", k, " n = ", n
-
-    ! Calculate the difference between the order of the error and order of the derivative.
-    !c = k - n
-
-    ! Calculate the coefficients for the n'th derivative.
-    !dkcoefk(1:n+1) = dncoef1(n)
-    !print*, dkcoefk(1:n+1)
-
-    ! Calculate the coefficients for the k'th order error.
-    !dkcoefk(n+2:n+k+2) = - dncoef1(k) / k
-
-    ! Map coefficients.
-    !dncoefn(1:c)     = dkcoefk(n+2:n+1+c)
-    !dncoefn(c+1:n+k) = dkcoefk(1:n+1) + dkcoefk(n+2+c:n+k+2)
-
-  end function dncoefn
+    end do od
+    print*, d(2,4,:)
+    end function dncoefn
 
   function fdo1(func, x, h, coef1)
     ! forward numerical differentiator for n'th derivative with first order errors
@@ -149,7 +148,7 @@ contains
     n = size(coef1)-1
     ! Calculate Derivative with .
     cd: do i = 0, n
-      fdo1 = fdo1 + coef1(n-i+1) * func( x - (n-i)*h )
+      fdo1 = fdo1 + coef1(i+1) * func( x - (n-i)*h )
     end do cd
     fdo1 = fdo1/h**n
   end function fdo1
@@ -174,7 +173,7 @@ contains
     n = size(coef1)-1
     ! Calculate Derivative with .
     cd: do i = 0, n
-      bdo1 = bdo1 + coef1(i+1) * func( x - i*h )
+      bdo1 = bdo1 + coef1(n-i+1) * func( x - i*h )
     end do cd
     bdo1 = bdo1/h**n
   end function bdo1
@@ -200,11 +199,11 @@ contains
     ! Check if N is Even.
     cne: if (mod(n,2) == 0) then
       cde: do i = 0, n
-        cdo1 = cdo1 + coef1(i+1) * func( x + (n/2-i)*h )
+        cdo1 = cdo1 + coef1(n-i+1) * func( x + (n/2-i)*h )
       end do cde
     else cne
       cdo: do i = 0, n
-        cdo1 = cdo1 + coef1(i+1) * ( func( x - h/2._dp + (n/2._dp-i)*h ) + func( x + h/2._dp + (n/2._dp-i)*h ) )/2_dp
+        cdo1 = cdo1 + coef1(n-i+1) * ( func( x - h/2._dp + (n/2._dp-i)*h ) + func( x + h/2._dp + (n/2._dp-i)*h ) )/2_dp
       end do cdo
     end if cne
     cdo1 = cdo1/h**n
