@@ -64,69 +64,93 @@ contains
     end do cc
   end function dncoef1
 
-  function dncoefn(m, n, a, xi) result(rdncoefn)
+  function dncoefn(n, k, grid, xi) result(coefnk)
     ! n = order of the derivative.
     ! k = number of grid points (h-steps)
     ! xi
     ! rdncoefn = array of coefficients of nth order with k - n + 1 order of accuracy
     ! http://www.ams.org/journals/mcom/1988-51-184/S0025-5718-1988-0935077-0/S0025-5718-1988-0935077-0.pdf
     implicit none
-    integer, intent(in)            :: m, n
-    real(dp), intent(in)           :: xi, a(0:n)
-    !real(dp), optional             :: xi
-    real(dp)                       :: rdncoefn(0:n)
-    integer  :: sn, nu, sm
+    integer, intent(in)    :: n, k
+    real(dp), intent(in)   :: xi, grid(0:k)
+    integer  :: sk, nu, sn
     real(dp) :: c1, c2, c3
-    real(dp) :: d(0:m,0:n,0:n)
+    real(dp) :: coefnk(0:n,0:k,0:k)
 
-    ! Check whether we give xi, if not default to xi = 0
-    !if(.not. present(xi)) xi = 0._dp
+    ! Check for parameter errors.
 
-    ! Check array size.
-    !check_size: if( size(a) /= size(rdncoefn) .or. size(a) /= m + 1 ) then
-    !  write(*,*) " Error: num_diff: dncoefn: check_size: Grid size and the size of the coefficient table are not equal to n + 1. &
-    !               size(grid) = ", size(a), " size(rdncoefn) = ", size(rdncoefn), " n + 1 = ", n + 1
-    ! return
-    !end if check_size
-    d = 0._dp
-    d(0,0,0)  = 1._dp
+    coefnk = 0._dp
+    coefnk(0,0,0)  = 1._dp
     c1 = 1._dp
 
     ! Loop Over Derivatives.
-    od: do sn = 1, n
+    od: do sk = 1, k
 
       c2 = 1._dp
 
       ! Loop Over H-Steps.
-      ohs: do nu = 0, sn - 1
-        c3 = a(sn) - a(nu)
+      ohs: do nu = 0, sk - 1
+        c3 = grid(sk) - grid(nu)
         c2 = c2 * c3
 
         ! Inner loop Over Derivatives.
-        iod: do sm = 0, minval([sn, m])
+        iod: do sn = 0, minval([sk, n])
           ! Prevent Memory Dump
-          pmd1: if( sm /= 0 ) then
-            d(sm, sn, nu) = ( a(sn) - xi ) * d(sm,sn-1,nu) - sm * d(sm-1,sn-1,nu)
+          pmd1: if( sn /= 0 ) then
+            coefnk(sn, sk, nu) = ( grid(sk) - xi ) * coefnk(sn,sk-1,nu) - sn * coefnk(sn-1,sk-1,nu)
           else pmd1
-            d(sm, sn, nu) = ( a(sn) - xi ) * d(sm,sn-1,nu)
+            coefnk(sn, sk, nu) = ( grid(sk) - xi ) * coefnk(sn,sk-1,nu)
           end if pmd1
-          d(sm, sn, nu) = d(sm, sn, nu) / c3
+          coefnk(sn, sk, nu) = coefnk(sn, sk, nu) / c3
         end do iod
       end do ohs
 
       ! loop over derivatives
-      do sm = 0, minval([sn,m])
-        pmd2: if ( sm /= 0 ) then
-          d(sm, sn, sn) = c1/c2 * ( sm * d(sm-1,sn-1,sn-1) - (a(sn-1) - xi) *   d(sm,sn-1,sn-1) )
+      do sn = 0, minval([sk,n])
+        pmd2: if ( sn /= 0 ) then
+          coefnk(sn, sk, sk) = c1/c2 * ( sn * coefnk(sn-1,sk-1,sk-1) - (grid(sk-1) - xi) *   coefnk(sn,sk-1,sk-1) )
         else pmd2
-          d(sm, sn, sn) = -c1/c2 * (a(sn-1) - xi) *   d(sm,sn-1,sn-1)
+          coefnk(sn, sk, sk) = -c1/c2 * (grid(sk-1) - xi) *   coefnk(sn,sk-1,sk-1)
         end if pmd2
       end do
       c1 = c2
-
     end do od
-    print*, d(2,4,:)
-    end function dncoefn
+  end function dncoefn
+
+  function ndifnk(func, x, h, n, grid, coefn)
+    ! forward/backward numerical differentiator for n'th derivatives with k'th order errors
+    implicit none
+    real(dp), intent(in) :: x, h, grid(:), coefn(:)
+    integer, intent(in)  :: n
+    real(dp)             :: ndifnk
+    integer :: i, m
+    interface functn
+      function func(x)
+        use nrtype
+        real(dp), intent(in) :: x    ! Variables
+        real(dp)             :: func ! Function
+      end function func
+    end interface functn
+
+    ! Size of grid and coefn
+    ! Check Size.
+    check_size: if ( size(grid) == size(coefn) ) then
+      ! Asign m to the size of the array.
+      m = size(grid)
+    else check_size
+      write(*,*) " Error: num_diff: fdon: check_size: size(grid) must be equal to size(coefn); &
+                   size(grid) = ", size(grid), " size(coefn) = ", size(coefn)
+      return
+    end if check_size
+
+    ! Set fdon to 0.
+    ndifnk = 0._dp
+
+    ! Construct Derivative.
+    cd: do i = 1, m
+      ndifnk = ndifnk + coefn(i) * func( x + h * grid(i) )/h**n
+    end do cd
+  end function ndifnk
 
   function fdo1(func, x, h, coef1)
     ! forward numerical differentiator for n'th derivative with first order errors
@@ -179,7 +203,7 @@ contains
   end function bdo1
 
   function cdo1(func, x, h, coef1)
-    ! central numerical differentiator for n'th derivative with first order errors
+    ! central numerical differentiator for n'th derivatives with first order errors
     implicit none
     real(dp), intent(in) :: x, h
     integer, intent(in)  :: coef1(:)

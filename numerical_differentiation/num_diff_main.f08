@@ -6,6 +6,8 @@ program num_diff_main
   real(dp) :: start, finish
   real(dp) :: aux
   integer, allocatable :: coefs(:)
+  real(dp), allocatable :: coefnk(:,:,:,:), coefnkc(:,:,:)
+
 
   open(unit=1, file = 'test_numdif.dat')
   !do i = 0._dp, tau, 0.01_dp
@@ -19,9 +21,9 @@ program num_diff_main
   allocate(coefs(3))
   coefs = dncoef1(2)
 
-  do i = 0._dp, tau, 0.01_dp
-    write(1,*) i, fdo1(sine, i, 0.01_dp, coefs), bdo1(sine, i, 0.01_dp, coefs), cdo1(sine, i, 0.01_dp, coefs)
-  end do
+  !do i = 0._dp, tau, 0.01_dp
+  !  write(1,*) i, fdo1(sine, i, 0.01_dp, coefs), bdo1(sine, i, 0.01_dp, coefs), cdo1(sine, i, 0.01_dp, coefs)
+  !end do
 
   !deallocate(coefs)
   !aux = 0.
@@ -39,7 +41,21 @@ program num_diff_main
 !  print*, dncoef1(5)
 !  print*, dncoef1(6)
   !print*, dncoefn(2,3)
-  print*, dncoefn(2, 4, [0._dp,1._dp,2._dp,3._dp,4._dp], 0._dp)
+
+  allocate(coefnk(2,0:2,0:2,0:2))
+  allocate(coefnkc(0:2,0:2,0:4))
+  coefnk(1,:,:,:) = dncoefn(2, 2, [0._dp,1._dp,2._dp],0._dp)
+  coefnk(2,:,:,:) = dncoefn(2, 2, [0._dp,-1._dp,-2._dp],0._dp)
+  coefnkc(:,:,:)  = dncoefn(2, 2, [0._dp,1._dp,-1._dp,2._dp,-2._dp],0._dp)
+  print*, coefnk(1,2,2,:)
+  print*, coefnk(2,2,2,:)
+  print*, coefnkc(2,2,:)
+
+  do i = 0._dp, tau, 0.01_dp
+    write(1,*) i, sin(i) + ndifnk(sine, i, 0.01_dp, 2, [0._dp,1._dp,2._dp],  coefnk(1,2,2,:)),&
+                  sin(i) + ndifnk(sine, i, 0.01_dp, 2, [0._dp,-1._dp,-2._dp], coefnk(2,2,2,:)),&
+                  sin(i) + ndifnk(sine, i, 0.01_dp, 2, [0._dp,1._dp,-1._dp,2._dp,-2._dp], coefnkc(2,2,:))
+  end do
 
 
 contains
