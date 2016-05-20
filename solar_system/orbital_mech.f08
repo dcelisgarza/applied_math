@@ -1,6 +1,6 @@
 module orbital_mech
   use nrtype
-  use ode_int, only : velocity_verlet
+  use ode, only : velocity_verlet
 
   type orb_par
     real(dp) :: a  ! Major semi-axis.

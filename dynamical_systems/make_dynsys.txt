@@ -1,6 +1,6 @@
 # Defining variables.
-target = solar_system_main.out
-objects = nrtype.o plot.o find_roots.o ode.o orbital_mech.o solar_system_main.o
+target = attractors.out
+objects = nrtype.o ode.o dyn_sys.o attractors.o
 f08comp = gfortran-6
 FCFLAGS = -g
 #FCFLAGS = -O2 -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
@@ -10,19 +10,15 @@ $(target): $(objects)
 	$(f08comp) $(objects) $(FCFLAGS) -o $@
 nrtype.o: ../nrtype.f08
 	$(f08comp) $(FCFLAGS) -c ../nrtype.f08
-plot.o: ../plotting/plot.f08
-	$(f08comp) $(FCFLAGS) -c ../plotting/plot.f08
-find_roots.o: ../root_finding/find_roots.f08
-	$(f08comp) $(FCFLAGS) -c ../root_finding/find_roots.f08
 ode.o: ../ode/ode.f08
 	$(f08comp) $(FCFLAGS) -c ../ode/ode.f08
-orbital_mech.o: orbital_mech.f08
-	$(f08comp) $(FCFLAGS) -c orbital_mech.f08
-solar_system_main.o: solar_system_main.f08
-	$(f08comp) $(FCFLAGS) -c solar_system_main.f08
+dyn_sys.o: dyn_sys.f08
+	$(f08comp) $(FCFLAGS) -c dyn_sys.f08
+attractors.o: attractors.f08
+	$(f08comp) $(FCFLAGS) -c attractors.f08
 # Cleaning everything
 clean:
-	rm -f *.o *.mod *.dat *.gnu *.gif
+	rm -f *.o *.mod
 clobber: clean
 	rm -f $(target)
 .PHONY: default clean cobbler

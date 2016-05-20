@@ -142,7 +142,7 @@ contains
     integer                 :: i, n_intvl
 
     ! Initialise the number of intervals found.
-    int_count = 0
+    n_intvl = 0
 
     ! Set initial x to the value of the master interval.
     x  = intvl(1)
