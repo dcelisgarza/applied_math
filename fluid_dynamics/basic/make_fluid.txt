@@ -1,0 +1,24 @@
+# Defining variables.
+target = fluid.out
+objects = nrtype.o ode.o fluid.o fluid_main.o
+f08comp = gfortran-6
+FCFLAGS = -g
+#FCFLAGS = -O2 -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
+# Makefile
+default: $(target)
+$(target): $(objects)
+	$(f08comp) $(objects) $(FCFLAGS) -o $@
+nrtype.o: ../../nrtype.f08
+	$(f08comp) $(FCFLAGS) -c ../../nrtype.f08
+ode.o: ../../ode/ode.f08
+	$(f08comp) $(FCFLAGS) -c ../../ode/ode.f08
+fluid.o: fluid.f08
+	$(f08comp) $(FCFLAGS) -c fluid.f08
+fluid_main.o: fluid_main.f08
+	$(f08comp) $(FCFLAGS) -c fluid_main.f08
+# Cleaning everything
+clean:
+	rm -f *.o *.mod *.dat *.gnu *.gif
+clobber: clean
+	rm -f $(target)
+.PHONY: default clean cobbler
