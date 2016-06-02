@@ -102,7 +102,7 @@ contains
     real(dp), intent(in)           :: kcfl
     integer, intent(in)            :: grid_size(:) ! Sizes of the grid. grid_size(1) = size_x, grid_size(2) = size_y, grid_size(3) = size_z
     type(FluidCell), intent(inout) :: grid(:,:,:)
-    integer :: i, j, k, l, m, two_step_counter ! Counters
+    integer :: i, j, k, l, two_step_counter ! Counters
     integer :: buffer_idx, cell_idx(6) ! Index for buffer at i,j,k, index for the cell at which a buffer will be created.
 
     ! Set layer of all cells including buffer cells to -1
@@ -113,6 +113,7 @@ contains
 
     ! TO DO: MAKE THE PARTICLE MARKERS A LINKED LIST WITH THE INDICES OF THE CELL IN WHICH THEY ARE FOUND. THIS TRIPLE LOOP SHIT CAN GO TO HELL, AND YOU CAN SIMPLY TRAVERSE THE LINKED LIST AND OBTAINING THE INDICES OF THE CORRESPONDING GRID CELL. THIS CAN HELP WHEN EXPANDING THE CODE TO INCLUDE SINKS AND SOURCES.
 
+    ! Update cells that currently have fluid in them.
     dok: do k = 1, grid_size(3)
       doj: do j = 1, grid_size(2)
         doi: do i = 1, grid_size(1)
@@ -129,6 +130,7 @@ contains
       end do doj
     end do dok
 
+    ! Create buffer zone.
     dol: do l = 1, max(2, ceiling(kcfl))
 
       dok2: do k = 1, grid_size(3)
@@ -136,10 +138,7 @@ contains
           doi2: do i = 1, grid_size(1)
 
             ! If the grid does NOT contain liquid or air, and its layer is not i-1, cycle.
-            !if (grid(i,j,k) % cell_type == 3 .or. grid(i,j,k) % layer /= l-1) cycle doi2
-            ctl: if ( ( grid(i,j,k) % cell_type == 1   .or.  &
-            grid(i,j,k) % cell_type == 2 ) .and. &
-            grid(i,j,k) % layer == l - 1 ) then
+            if (grid(i,j,k) % cell_type == 3 .or. grid(i,j,k) % layer /= l-1) cycle doi2
 
             ! Set buffer index to 0.
             buffer_idx = 0
@@ -149,11 +148,10 @@ contains
             two_step_counter = 0
 
             ! For each of the six neighbours of grid(i,j,k), update buffer.
-            dom: do m = 1, 6
-              ! Increase two_step_counter every two odd step.
-              if ( mod(m,2) /= 0 ) two_step_counter = two_step_counter + 1
+            dob: do buffer_idx = 1, 6
+              ! Increase two_step_counter every odd step in buffer_idx.
+              if ( mod(buffer_idx,2) /= 0 ) two_step_counter = two_step_counter + 1
               ! Increase the buffer index.
-              buffer_idx = buffer_idx + 1
 
               ! Check Buffer is Not Initial.
               bni: if (grid(i,j,k) % buffer(buffer_idx) % initial .eqv. .false.) then
@@ -169,15 +167,13 @@ contains
               grid(i,j,k) % buffer(buffer_idx) % initial   = .false.
               grid(i,j,k) % buffer(buffer_idx) % layer     = l
               ! Check whether the cell index which corresponds to the buffer is Out of Bounds.
-              ob: if (cell_idx(m) < 1 .or. cell_idx(m) > grid_size(two_step_counter)) then
+              ob: if (cell_idx(buffer_idx) < 1 .or. cell_idx(buffer_idx) > grid_size(two_step_counter)) then
                 grid(i,j,k) % buffer(buffer_idx) % cell_type = 3
               else ob
                 grid(i,j,k) % buffer(buffer_idx) % cell_type = 1
               end if ob
             end if bni
-          end do dom
-
-        end if ctl
+          end do dob
 
       end do doi2
     end do doj2
@@ -188,7 +184,7 @@ end do dol
 dok3: do k = 1, grid_size(3)
   doj3: do j = 1, grid_size(2)
     doi3: do i = 1, grid_size(1)
-      dom2: do m = 1, 6
+      dom2: do buffer_idx = 1, 6
         if (grid(i,j,k) % buffer(buffer_idx) % layer == -1) grid(i,j,k) % buffer(buffer_idx) % initial = .true.
       end do dom2
     end do doi3
