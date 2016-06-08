@@ -1,33 +1,33 @@
 module fluid
   use nrtype
-  use ode
+  use ode, only : rkck
+  use interpolation, only : cctrilinint
   implicit none
 
   ! Based on
   ! http://cg.informatik.uni-freiburg.de/intern/seminar/gridFluids_fluid_flow_for_the_rest_of_us.pdf
 
   ! Define type for a fluid.
-  type FluidQty
-    ! Value of the quantity.
-    real(dp) :: value
-    !--------------------------------------------------------------------------!
-    ! Offset of the quantity with respect to the main vertex.
+  type GridParameters
+    ! Offset of the quantity with respect to the main vertex of a given grid cell.
     ! offset(1) := offset_x, offset(2) := offset_y, offset(3) := offset_z
     ! Pressure is offset to the middle of the cell:
     ! coordinates( Pressure ) = ( x + d/2,  y + d/2, z + d/2)
     ! Velocity is offset to the center of the minimal surface of its coordinate.
-    ! coordinates( Vel x ) = ( x        , y + d/2, z + d/2 )
-    ! coordinates( Vel y ) = ( x + d/2, y        , z + d/2 )
-    ! coordinates( Vel z ) = ( x + d/2, y + d/2, z         )
-    real(dp) :: offset(3)
-  end type FluidQty
+    ! velocity_offset(1,1:3) := offset( Vel x ) = ( x      , y + d/2, z + d/2 )
+    ! velocity_offset(2,1:3) := offset( Vel y ) = ( x + d/2, y      , z + d/2 )
+    ! velocity_offset(1,1:3) := offset( Vel z ) = ( x + d/2, y + d/2, z       )
+    real(dp) :: velocity_offset(3,3)
+    real(dp) :: pressure_offset(3)
+    real(dp) :: grid_volume
+  end type GridParameters
 
   type FluidBuffer
     integer :: cell_type
     logical :: initial = .true.
     integer :: layer
-    type(FluidQty) :: velocity(3)
-    type(FluidQty) :: pressure
+    real(dp):: velocity(3)
+    real(dp):: pressure
   end type FluidBuffer
 
   type FluidCell
@@ -55,10 +55,12 @@ module fluid
     !--------------------------------------------------------------------------!
     ! Velocity.
     ! velocity(1) = vel_x, velocity(2) = vel_y, velocity(3) = vel_z
-    type(FluidQty) :: velocity(3)
+    real(dp) :: velocity(3)
+    ! TMP Velocity, advancing velocity fields can't be done in-place.
+    real(dp), allocatable :: tmp_velocity(:)
     !--------------------------------------------------------------------------!
     ! Pressure.
-    type(FluidQty) :: pressure
+    real(dp) :: pressure
     !--------------------------------------------------------------------------!
     ! Buffer cell
     type(FluidBuffer) :: buffer(6)
@@ -90,7 +92,7 @@ contains
         doi: do i = 1, size(grid, dim = 1)
           ! If the cell type does not contain liquid, skip to the next i.
           if ( grid(i, j, k) % marker == 0 ) cycle doi
-          tmp_vel = norm2(grid(i, j, k) % velocity % value)
+          tmp_vel = norm2(grid(i, j, k) % velocity)
           if (tmp_vel > max_vel) max_vel = tmp_vel
         end do doi
       end do doj
@@ -111,7 +113,7 @@ contains
       grid % buffer(i) % layer = -1
     end do
 
-    ! TO DO: MAKE THE PARTICLE MARKERS A LINKED LIST WITH THE INDICES OF THE CELL IN WHICH THEY ARE FOUND. THIS TRIPLE LOOP SHIT CAN GO TO HELL, AND YOU CAN SIMPLY TRAVERSE THE LINKED LIST AND OBTAINING THE INDICES OF THE CORRESPONDING GRID CELL. THIS CAN HELP WHEN EXPANDING THE CODE TO INCLUDE SINKS AND SOURCES.
+    ! TO DO: MAKE THE PARTICLE MARKERS A LINKED LIST WITH THE INDICES OF THE CELL IN WHICH THEY ARE FOUND. THIS Tvector in each grid cell. We found this be easier and more memory eRIPLE LOOP SHIT CAN GO TO HELL, AND YOU CAN SIMPLY TRAVERSE THE LINKED LIST AND OBTAINING THE INDICES OF THE CORRESPONDING GRID CELL. THIS CAN HELP WHEN EXPANDING THE CODE TO INCLUDE SINKS AND SOURCES.
 
     ! Update cells that currently have fluid in them.
     dok: do k = 1, grid_size(3)
@@ -129,7 +131,6 @@ contains
         end do doi
       end do doj
     end do dok
-
     ! Create buffer zone.
     dol: do l = 1, max(2, ceiling(kcfl))
 
@@ -175,22 +176,34 @@ contains
             end if bni
           end do dob
 
-      end do doi2
-    end do doj2
-  end do dok2
+        end do doi2
+      end do doj2
+    end do dok2
 
-end do dol
+  end do dol
 
-dok3: do k = 1, grid_size(3)
-  doj3: do j = 1, grid_size(2)
-    doi3: do i = 1, grid_size(1)
-      dom2: do buffer_idx = 1, 6
-        if (grid(i,j,k) % buffer(buffer_idx) % layer == -1) grid(i,j,k) % buffer(buffer_idx) % initial = .true.
-      end do dom2
-    end do doi3
-  end do doj3
-end do dok3
+  dok3: do k = 1, grid_size(3)
+    doj3: do j = 1, grid_size(2)
+      doi3: do i = 1, grid_size(1)
+        dom2: do buffer_idx = 1, 6
+          if (grid(i,j,k) % buffer(buffer_idx) % layer == -1) grid(i,j,k) % buffer(buffer_idx) % initial = .true.
+        end do dom2
+      end do doi3
+    end do doj3
+  end do dok3
 
 end subroutine update_grid
+
+subroutine advect(grid)
+  implicit none
+  type(FluidCell), intent(in) :: grid(:,:,:)
+
+  !call rkck(derivs, x, yi, yf, er, h)
+end subroutine advect
+
+subroutine interpolate_velocity(grid,x)
+  implicit none
+  type(FluidGrid)
+end subroutine interpolate_velocity
 
 end module fluid

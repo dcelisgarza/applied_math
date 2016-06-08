@@ -97,7 +97,7 @@ contains
     tmp = z
 
     ! Calculate Gamma Function
-    cgf: if( real(tmp) < 0.5_dp ) then
+    cgf: if( real(tmp) <= 0.5_dp ) then
 
       gamma = pi / ( sin(pi*tmp) * rcsv_gamma(1._dp-tmp) )
 
@@ -134,7 +134,7 @@ contains
     tmp = z
 
     ! Calculate Ln(Gamma), it takes the main branch cut.
-    clg: if (real(tmp) < 0.5_dp) then
+    clg: if (real(tmp) <= 0.5_dp) then
 
       ln_gamma = lnpi - log(sin(pi*tmp)) - rcsv_ln_gamma(1._dp-tmp)
 

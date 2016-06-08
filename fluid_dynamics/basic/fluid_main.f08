@@ -5,6 +5,7 @@ program fluid_main
   real(dp) :: umax, tumax, r
   type(FluidCell), allocatable :: grid(:,:,:)
   integer :: grid_size(3)
+  integer :: a(3), b(3), c(3), d(3), e(3)
 
   allocate( grid(3,3,3) )
   do i = 1, 3
@@ -141,5 +142,26 @@ do i = 1, 6
   print*, grid % buffer(i) % initial
 end do
 ! Test successful.
+
+! Testing intrinsic product.
+print*, "----------------------------"
+b = [3,4,5]
+c = [1,2,3]
+d = b - c
+e = (b(1) - c(1)) * (b(2) - c(2)) * (b(3) - c(3))
+a = product(b - c)
+
+print*, "d = ", d, " e = ", e, " a = ", a
+
+!wrapper subroutine
+! does stuff, prepares indices !
+! x = point to be interpolated
+! idx = floor(x)
+
+!do i = 1, 3
+!velocoity(i) = cctrilinint(grid%velocity(i), x, idx)
+!end do
+!end wrapper subroutine
+
 
 end program fluid_main
