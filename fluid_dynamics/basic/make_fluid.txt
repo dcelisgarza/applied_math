@@ -1,6 +1,6 @@
 # Defining variables.
 target = fluid.out
-objects = nrtype.o ode.o fluid.o fluid_main.o
+objects = nrtype.o lin_alg.o interpolation.o fluid_types.o fluid.o fluid_main.o
 f08comp = gfortran-6
 FCFLAGS = -g
 #FCFLAGS = -O2 -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
@@ -10,10 +10,14 @@ $(target): $(objects)
 	$(f08comp) $(objects) $(FCFLAGS) -o $@
 nrtype.o: ../../nrtype.f08
 	$(f08comp) $(FCFLAGS) -c ../../nrtype.f08
-ode.o: ../../ode/ode.f08
-	$(f08comp) $(FCFLAGS) -c ../../ode/ode.f08
+lin_alg.o: ../../lin_alg/lin_alg.f08
+	$(f08comp) $(FCFLAGS) -c ../../lin_alg/lin_alg.f08
+interpolation.o: ../../interpolation/interpolation.f08
+	$(f08comp) $(FCFLAGS) -c ../../interpolation/interpolation.f08
 fluid.o: fluid.f08
 	$(f08comp) $(FCFLAGS) -c fluid.f08
+fluid_types.o: fluid_types.f08
+	$(f08comp) $(FCFLAGS) -c fluid_types.f08
 fluid_main.o: fluid_main.f08
 	$(f08comp) $(FCFLAGS) -c fluid_main.f08
 # Cleaning everything

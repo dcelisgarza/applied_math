@@ -1,71 +1,10 @@
 module fluid
-  use nrtype
-  use ode, only : rkck
   use interpolation, only : cctrilinint
+  use fluid_types
   implicit none
 
   ! Based on
   ! http://cg.informatik.uni-freiburg.de/intern/seminar/gridFluids_fluid_flow_for_the_rest_of_us.pdf
-
-  ! Define type for a fluid.
-  type GridParameters
-    ! Offset of the quantity with respect to the main vertex of a given grid cell.
-    ! offset(1) := offset_x, offset(2) := offset_y, offset(3) := offset_z
-    ! Pressure is offset to the middle of the cell:
-    ! coordinates( Pressure ) = ( x + d/2,  y + d/2, z + d/2)
-    ! Velocity is offset to the center of the minimal surface of its coordinate.
-    ! velocity_offset(1,1:3) := offset( Vel x ) = ( x      , y + d/2, z + d/2 )
-    ! velocity_offset(2,1:3) := offset( Vel y ) = ( x + d/2, y      , z + d/2 )
-    ! velocity_offset(1,1:3) := offset( Vel z ) = ( x + d/2, y + d/2, z       )
-    real(dp) :: velocity_offset(3,3)
-    real(dp) :: pressure_offset(3)
-    real(dp) :: grid_volume
-  end type GridParameters
-
-  type FluidBuffer
-    integer :: cell_type
-    logical :: initial = .true.
-    integer :: layer
-    real(dp):: velocity(3)
-    real(dp):: pressure
-  end type FluidBuffer
-
-  type FluidCell
-    !--------------------------------------------------------------------------!
-    ! When using a hash table, make a type for marker particles.
-    ! Marker particle.
-    ! marker = 0 -> no particle, marker = 1 -> particle
-    integer :: marker
-    ! Cell type.
-    ! m = 1 -> empty.
-    ! m = A_n -> material n, n > 1
-    ! In this example, m = 2 -> fluid, m = 3 -> solid
-    integer :: cell_type
-    !--------------------------------------------------------------------------!
-    ! Help simulation step that builds outwards from the fluid into the air buffer
-    integer :: layer
-    !--------------------------------------------------------------------------!
-    ! Coordinates of the main vertex of the cell.
-    ! Main vertex := left-down of the 2D cell, or left-down-back of the 3D cell.
-    ! x(1) := x, x(2) := y, x(3) := z
-    real(dp) :: x(3)
-    !--------------------------------------------------------------------------!
-    ! Dimensions of the cell.
-    real(dp) :: cell_dim
-    !--------------------------------------------------------------------------!
-    ! Velocity.
-    ! velocity(1) = vel_x, velocity(2) = vel_y, velocity(3) = vel_z
-    real(dp) :: velocity(3)
-    ! TMP Velocity, advancing velocity fields can't be done in-place.
-    real(dp), allocatable :: tmp_velocity(:)
-    !--------------------------------------------------------------------------!
-    ! Pressure.
-    real(dp) :: pressure
-    !--------------------------------------------------------------------------!
-    ! Buffer cell
-    type(FluidBuffer) :: buffer(6)
-  end type FluidCell
-
 contains
   subroutine timestep(kcfl, cell_dim, max_vel, h)
     ! Calculate the time step.
@@ -201,9 +140,168 @@ subroutine advect(grid)
   !call rkck(derivs, x, yi, yf, er, h)
 end subroutine advect
 
-subroutine interpolate_velocity(grid,x)
+subroutine evolve_velocity(grid, xi, t, h, cell_volume, velocity_offset)
   implicit none
-  type(FluidGrid)
+  type(FluidCell), intent(inout) :: grid(:,:,:)
+  real(dp), intent(in)           :: xi(:), t, h, cell_volume, velocity_offset(:,:)
+  integer :: idx(size(xi))
+
+  ! Set up the index, to save execution time.
+  idx = floor(xi)
+
+
+
+
+end subroutine evolve_velocity
+
+subroutine interpolate_velocity(grid, x, idx, cell_volume, velocity_offset)
+  ! Interpolate the velocity within the grid from the 8 neighbours.
+  implicit none
+  type(FluidCell), intent(inout) :: grid(:,:,:) ! Grid
+  real(dp), intent(in)           :: x(:), cell_volume, velocity_offset(:,:) ! Coordinates, cell volume
+  integer, intent(in)            :: idx(:)
+  real(dp) :: tmp_x(size(x))
+  integer  :: i ! counter
+
+  interp_vel: do i = 1, size(x)
+    ! Correct position offset.
+    tmp_x = x - velocity_offset(i,:)
+
+    ! Interpolate velocity.
+    grid(idx(1),idx(2),idx(3)) % tmp_velocity(i) = cctrilinint(grid % tmp_velocity(i), tmp_x, idx, cell_volume)
+  end do interp_vel
+
 end subroutine interpolate_velocity
+
+subroutine rkck(interp_vel, grid, xi, idx, t, h, cell_volume, velocity_offset)
+  !=========================================================!
+  ! Backward particle trace                                 !
+  ! Cash-Karp RK45                                          !
+  ! Daniel Celis Garza 6 June 2016                          !
+  !---------------------------------------------------------!
+  ! f(x,y,dydx) = ODEs to be solved                         !
+  ! Let n := size(y) then for a k'th order system           !
+  ! y(1+i*n/k:(i+1)*n/k) := i'th order derivative           !
+  !---------------------------------------------------------!
+  ! Inputs:                                                 !
+  ! derivs = derivatives                                    !
+  ! t      = time @ step i                                  !
+  ! h      = step size                                      !
+  ! cell_volume = cell_volume                               !
+  ! velocity_offset(:,:) = offset for the velocities        !
+  ! x(:) = position of the particle.                        !
+  !---------------------------------------------------------!
+  ! Input-Output                                            !
+  ! grid(:,:,:) = Fluid dynamics grid                       !
+  !---------------------------------------------------------!
+  ! Locals:                                                 !
+  ! ys() = array of dependent variables @ stage s of step i !
+  ! ki() = array of Runge-Kutta k/h                         !
+  ! ci   = Butcher Table c-vector                           !
+  ! aij  = Butcher Table A-matrix                           !
+  ! bi   = Butcher Table b-vector                           !
+  ! dbi  = b-b* vector difference for error calculation     !
+  !=========================================================!
+  implicit none
+  real(dp), intent(in)          :: t, h, cell_volume, velocity_offset(:,:), xi(:)
+  integer, intent(in)           :: idx(:)
+  type(FluidCell), intent(inout):: grid(:,:,:)
+  real(dp), dimension(size(xi)) :: k1, k2, k3, k4, k5, k6, xs
+  real(dp)                      :: c2, c3, c4, c5, c6, a21, a31, a32, a41, &
+                                   a42, a43, a51, a52, a53, a54, a61, a62, &
+                                   a63, a64, a65, b1, b3, b4, b6
+  parameter ( c2 = .2_dp, c3 = .3_dp, c4 = .6_dp, c5 = 1._dp, c6 = .875_dp, &
+              a21 = .2_dp, a31 = .075_dp, a32 = .225_dp, &
+              a41 = .3_dp, a42 = -.9_dp, a43 = 1.2_dp, &
+              a51 = -11._dp / 54._dp, a52 = 2.5_dp, a53 = -70._dp / 27._dp, &
+              a54 = 35._dp / 27._dp, a61 = 1631._dp / 55296._dp, &
+              a62 = 175._dp / 512._dp, a63 = 575._dp / 13824._dp, &
+              a64 = 44275. / 110592._dp, a65 = 253. / 4096._dp, &
+              b1 = 37._dp / 378._dp, b3 = 250._dp / 621._dp, &
+              b4 = 125._dp / 594._dp, b6 = 512._dp / 1771._dp )
+
+  interface interpolated_velocities
+    subroutine interp_vel(grid, x, idx, cell_volume, velocity_offset)
+      use fluid_types
+      implicit none
+      type(FluidCell), intent(inout) :: grid(:,:,:) ! Grid
+      real(dp), intent(in)           :: x(:), cell_volume, velocity_offset(:,:) ! Coordinates,
+      integer, intent(in)            :: idx(:)
+    end subroutine interp_vel
+  end interface interpolated_velocities
+
+  ! Calculate k1.
+  call interp_vel(grid, xi, idx, cell_volume, velocity_offset)
+  k1 = grid(idx(1),idx(2),idx(3)) % tmp_velocity
+  xs = xi + h * a21 * k1
+
+  ! Calculate k2.
+  call interp_vel(grid, xs, idx, cell_volume, velocity_offset)
+  k2 = grid(idx(1),idx(2),idx(3)) % tmp_velocity
+  xs = xi + h * (a31 * k1 + a32 * k2)
+
+  ! Calculate k3.
+  call interp_vel(grid, xs, idx, cell_volume, velocity_offset)
+  k3 = grid(idx(1),idx(2),idx(3)) % tmp_velocity
+  xs = xi + h * (a41 * k1 + a42 * k2 + a43 * k3)
+
+  ! Calculate k4.
+  call interp_vel(grid, xs, idx, cell_volume, velocity_offset)
+  k4 = grid(idx(1),idx(2),idx(3)) % tmp_velocity
+  xs = xi + h * (a51 * k1 + a52 * k2 + a53 * k3 + a54 * k4)
+
+  ! Calculate k5.
+  call interp_vel(grid, xs, idx, cell_volume, velocity_offset)
+  k5 = grid(idx(1),idx(2),idx(3)) % tmp_velocity
+  xs = xi + h * (a61 * k1 + a62 * k2 + a63 * k3 + a64 * k4 + a65 * k5)
+
+  ! Calculate k6.
+  call interp_vel(grid, xs, idx, cell_volume, velocity_offset)
+  k6 = grid(idx(1),idx(2),idx(3)) % tmp_velocity
+  grid(idx(1),idx(2),idx(3)) % tmp_x = xi + h * (b1 * k1 + b3 * k3 + b4 * k4 + b6 * k6)
+
+end subroutine rkck
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 end module fluid
