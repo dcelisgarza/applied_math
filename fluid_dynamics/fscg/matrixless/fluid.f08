@@ -49,25 +49,16 @@ module fluid
   end type Vec3D
 
 contains
-  function Lerp1D(FldQty, xi, x)
+  function Lerp1D(FldQty, yi, x)
     ! Linear intERPolate in 1D.
-    ! 1D interpolation between xi(3) < y < xi(4) for x(1) < x < x(2)
+    ! 1D interpolation between yi(1) < y < yi(4) for 0 < x < 1
     implicit none
     class(FluidQty), intent(in) :: FldQty
-    real(dp)       , intent(in) :: xi(4), x
+    real(dp)       , intent(in) :: yi(2), x
     real(dp)                    :: lerp1d
 
-    Lerp1D = xi(3)*(xi(2)-x) + xi(4)*(x-xi(1))
+    Lerp1D = yi(1)*(1.0 - x) + yi(2)*x
 
-    print*, "xi(1) = ", xi(1)
-    print*, "xi(2) = ", xi(2)
-    print*, "xi(3) = ", xi(3)
-    print*, "xi(4) = ", xi(4)
-    print*, "x = ", x
-
-    print*, "xi(3)*(xi(2)-x) = ", xi(3)*(xi(2)-x)
-    print*, "xi(4)*(x-xi(1)) = ", xi(4)*(x-xi(1))
-    print*, "Lerp1D = ", Lerp1D
   end function Lerp1D
 
   function Lerp2D(FldQty, xi)
@@ -77,8 +68,8 @@ contains
     real(dp)                    :: Lerp2D
     real(dp)                    :: x(2)
     integer                     :: ix(2)
-    real(dp)                    :: cvtc(4) ! Cell vertices. cvtc(1) = x00, cvtc(2) = x10, cvtc(3) = x01, cvtc(4) = x11
-    integer, parameter          :: ivtc(8) = [0,1,0,1,0,0,1,1] ! Index array of the cell vertices.
+    real(dp)                    :: VtxVal(4) ! VALues at cell VERtices. VtxVal(1) = x00, VtxVal(2) = x10, VtxVal(3) = x01, VtxVal(4) = x11
+    integer, parameter          :: ivtc(8) = [0,1,0,1,0,0,1,1] + 1 ! Index array of the cell vertex displacements.
     ! x01   -----------   x11
     !       |         |
     !       |         |
@@ -93,15 +84,17 @@ contains
     ! We make sure 0 < x < 1
     x  = x - ix
 
-    cvtc(1:4) = FldQty % ReadVal(ix(1) + ivtc(1:4) + 1, ix(2) + ivtc(5:8) + 1)
+    ! Values at vertices.
+    VtxVal(1:4) = FldQty % ReadVal(ix(1) + ivtc(1:4), ix(2) + ivtc(5:8))
 
-    Lerp2D = FldQty % Lerp(                                                 &
-                            [                                               &
-                              0._dp, 1._dp                                , &
-                              FldQty % Lerp([0._dp, 1._dp,cvtc(1:2)],x(1)), &
-                              FldQty % Lerp([0._dp, 1._dp,cvtc(3:4)],x(1))  &
-                            ]                                            ,  &
-                            x(2)                                            &
+    Lerp2D = FldQty % Lerp(                        &
+                [                                  &
+                  ! Lower edge: x00, x10.
+                  FldQty % Lerp(VtxVal(1:2),x(1)), &
+                  ! Upper edge: x01, x11.
+                  FldQty % Lerp(VtxVal(3:4),x(1))  &
+                ],                                 &
+                x(2)                               &
                            )
 
 
@@ -110,10 +103,60 @@ contains
   function Lerp3D(FldQty, xi)
     implicit none
     class(FluidQty), intent(in) :: FldQty
-    type(Vec3D),     intent(in) :: xi(3)! xi(1) = x, xi(2) = y, xi(3) = z
+    type(Vec3D),     intent(in) :: xi! xi%x(1) = x, xi%x(2) = y, xi%x(3) = z
     real(dp)                    :: Lerp3D
+    real(dp)                    :: x(3)
+    integer                     :: ix(3)
+    real(dp)                    :: VtxVal(8) ! Values at cell vertices. VtxVal(1) = x000, VtxVal(2) = x100, VtxVal(3) = x010, VtxVal(4) = x110, VtxVal(5) = x001, VtxVal(6) = x101, VtxVal(7) = x011, VtxVal(8) = x111
+    integer, parameter          :: ivtc(24) = [0,1,0,1,0,1,0,1,0,0,1,1,0,0,1,1,0,0,0,0,1,1,1,1] + 1 ! Index array of the cell vertex displacements.
 
-    ! Make lerp 3D
+     !    x011  ------------- x111
+    !          /|          /|
+    !         / |         / |
+    !        /  |        /  |
+    ! x010  ----|--------   | x110
+    !       |   |       |   |
+    !  x001 |   ------------ x101
+    !       |  /        |  /
+    !       | /         | /
+    !       |/          |/
+    ! x000  ------------- x100
+
+    ! Clamp coordinates to the boundaries.
+    x = min( max(xi % x - FldQty % ost(1:3), 0.), FldQty % whd(1:3) )
+
+    ! Prepare interpolation values.
+    ix = floor( x )
+    ! We make sure 0 < x < 1
+    x  = x - ix
+
+    VtxVal(1:8) = FldQty % ReadVal(ix(1) + ivtc(1:8), ix(2) + ivtc(9:16), ix(3) + ivtc(17:24))
+
+    Lerp3D = FldQty % Lerp(                            &
+                [                                      &
+                  ! Front face x000, x100, x010, x110
+                  FldQty % Lerp(                       &
+                    [                                  &
+                      ! Lower edge: x000, x100.
+                      FldQty % Lerp(VtxVal(1:2),x(1)), &
+                      ! Upper edge: x010, x110.
+                      FldQty % Lerp(VtxVal(3:4),x(1))  &
+                    ]                                , &
+                    x(2)                               &
+                               ),                      &
+                  ! Back face x001, x101, x011, x111
+                  FldQty % Lerp(                       &
+                    [                                  &
+                      FldQty % Lerp(VtxVal(5:6),x(1)), &
+                      FldQty % Lerp(VtxVal(7:8),x(1))  &
+                    ]                                , &
+                    x(2)                               &
+                              )                        &
+                ],                                     &
+                x(3)                                   &
+                          )
+
+
   end function Lerp3D
 
   subroutine FEulerVel2D(FldQty, xi, xf, h)

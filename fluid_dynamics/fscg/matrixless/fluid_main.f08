@@ -160,6 +160,6 @@ program fluid_main
     end do
 
     !xi % x = [0.5_dp,0.5_dp]
-    print*, FldSlv % u(2) % Lerp(Vec2D([0.5_dp,0.5_dp]))
+    print*, FldSlv % u(2) % Lerp(Vec2D([2._dp,0.5_dp]))
 
 end program fluid_main
