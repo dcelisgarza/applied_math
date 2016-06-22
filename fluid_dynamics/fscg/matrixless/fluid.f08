@@ -13,6 +13,9 @@ module fluid
   contains
     ! Initialise type.
     procedure :: Init => InitFluidQty
+    ! Add fluid flow.
+    procedure :: AddFlow2D, AddFlow3D
+    generic   :: AddFlow => AddFlow2D, AddFlow3D
     ! Read values.
     procedure :: ReadVal2D, ReadVal3D
     generic   :: ReadVal => ReadVal2D, ReadVal3D
@@ -29,6 +32,9 @@ module fluid
     ! Integrate.
     procedure :: FEulerVel2D, FEulerVel3D
     generic   :: FEuler => FEulerVel2D, FEulerVel3D
+    ! Advect.
+    procedure :: Advect2D, Advect3D
+    generic   :: Advect => Advect2D, Advect3D
   end type FluidQty
 
   type FluidSlv
@@ -43,11 +49,17 @@ module fluid
   contains
     ! Initialise type.
     procedure :: Init => InitFluid
+    ! Build right hand side.
+    procedure :: BuildRhs, BuildRhs2D, BuildRhs3D
   end type FluidSlv
 
   type Vec2D
     real(dp) :: x(2)
   end type Vec2D
+
+  type FluidQty2D
+    type(FluidQty) :: FldQty(2)
+  end type FluidQty2D
 
   type Vec2D2
     real(dp) :: x(4)
@@ -57,11 +69,17 @@ module fluid
     real(dp) :: x(3)
   end type Vec3D
 
+  type FluidQty3D
+    type(FluidQty) :: FldQty(3)
+  end type FluidQty3D
+
   type Vec3D2
     real(dp) :: x(6)
   end type Vec3D2
 
 contains
+
+
   pure function Lerp1D(FldQty, yi, x)
     ! Linear intERPolate in 1D.
     ! 1D interpolation between yi(1) < y < yi(4) for 0 < x < 1
@@ -166,7 +184,7 @@ contains
                       FldQty % Lerp(VtxVal(7:8),x(1))  &
                     ]                                , &
                     x(2)                               &
-                              )                               &
+                              )                        &
                 ],                                     &
                 x(3)                                   &
                           )
@@ -202,11 +220,11 @@ contains
 
   subroutine Advect2D(FldQty, FldVel, h)
     implicit none
-    class(FluidQty), intent(inout) :: FldQty
-    type(FluidQty) , intent(inout) :: FldVel(2)
-    real(dp)       , intent(in)    :: h
-    real(dp)                       :: x(2)
-    integer                        :: i, j
+    class(FluidQty) , intent(inout) :: FldQty
+    type(FluidQty2D), intent(in)    :: FldVel
+    real(dp)        , intent(in)    :: h
+    real(dp)                        :: x(2)
+    integer                         :: i, j
 
     ! Loop through y.
     ly: do j = 1, FldQty % whd(2)
@@ -216,7 +234,7 @@ contains
       lx: do i = 1, FldQty % whd(1)
         x(1) = i + FldQty % ost(1)
         ! Integrate FldQty.
-        call FldQty % FEuler(FldVel, Vec2D(x), x, h)
+        call FldQty % FEuler([FldVel % FldQty(1), FldVel % FldQty(2)], Vec2D(x), x, h)
         ! Interpolate component from grid and write new value.
         call FldQty % WriteNewVal(i, j, FldQty % Lerp(Vec2D(x)))
       end do lx
@@ -225,11 +243,11 @@ contains
 
   subroutine Advect3D(FldQty, FldVel, h)
     implicit none
-    class(FluidQty), intent(inout) :: FldQty
-    type(FluidQty) , intent(inout) :: FldVel(3)
-    real(dp), intent(in)           :: h
-    real(dp)                       :: x(3)
-    integer                        :: i, j, k
+    class(FluidQty) , intent(inout) :: FldQty
+    type(FluidQty3D), intent(inout) :: FldVel
+    real(dp)        , intent(in)    :: h
+    real(dp)                        :: x(3)
+    integer                         :: i, j, k
 
     ! Loop through z.
     lz: do k = 1, FldQty % whd(3)
@@ -243,7 +261,7 @@ contains
         lx: do i = 1, FldQty % whd(1)
           x(1) = i + FldQty % ost(1)
           ! Integrate FldQty.
-          call FldQty % FEuler(FldVel, Vec3D(x), x, h)
+          call FldQty % FEuler([FldVel % FldQty(1), FldVel % FldQty(2), FldVel % FldQty(3)], Vec3D(x), x, h)
           ! Interpolate component from grid and save the new value.
           call FldQty % WriteNewVal(i, j, k, FldQty % Lerp(Vec3D(x)))
         end do lx
@@ -251,7 +269,7 @@ contains
     end do lz
   end subroutine Advect3D
 
-  subroutine Add2DFlow(FldQty, xi, value)
+  subroutine AddFlow2D(FldQty, xi, value)
     implicit none
     class(FluidQty), intent(inout) :: FldQty
     type(Vec2D2)   , intent(in)    :: xi ! xi%x(1) = x0, xi%x(2) = x1, xi%x(3) = y0, xi%x(4) = y1
@@ -281,9 +299,9 @@ contains
       end do lx
     end do ly
 
-  end subroutine Add2DFlow
+  end subroutine AddFlow2D
 
-  subroutine Add3DFlow(FldQty, xi, value)
+  subroutine AddFlow3D(FldQty, xi, value)
     implicit none
     class(FluidQty), intent(inout) :: FldQty
     type(Vec3D2)   , intent(in)    :: xi ! xi%x(1) = x0, xi%x(2) = x1, xi%x(3) = y0, xi%x(4) = y1, xi%x(5) = z0, xi%x(6) = z1
@@ -322,7 +340,25 @@ contains
         end do lx
       end do ly
     end do lz
-  end subroutine Add3DFlow
+  end subroutine AddFlow3D
+
+  subroutine BuildRhs(FldSlv)
+    ! Build Rhs wrapper subroutine.
+    ! The actual subroutines build the pressure solution via the negative of the divergence as a forward finite difference (truly horrible). This is not the best way to go about doing this, but it will be fixed in the future.
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    integer, allocatable, save     :: ndim ! Number of dimensions.
+
+    if (.not. allocated(ndim)) then
+      allocate(ndim, source = size(FldSlv % u))
+    end if
+
+    if (ndim == 2) then
+      call FldSlv % BuildRhs2D
+    else
+      call FldSlv % BuildRhs3D
+    end if
+  end subroutine BuildRhs
 
   subroutine BuildRhs2D(FldSlv)
     implicit none
@@ -333,9 +369,8 @@ contains
     ! Calculate the scale.
     scale =  1./FldSlv % celsiz
 
-    ! Building the RHS of the pressure matrix equation recursively with the nearest neighbours (sparse matrix).
+    idx = 1
     ly: do j = 1, FldSlv % whd(2)
-      idx = 1
       lx: do i = 1, FldSlv % whd(1)
         FldSlv % prhs(idx) = -scale * ( &
                                          FldSlv % u(1) % ReadVal(i+1, j  ) &
@@ -356,9 +391,8 @@ contains
     ! Calculate the scale.
     scale =  1./FldSlv % celsiz
 
-    ! Building the RHS of the pressure matrix equation recursively with the nearest neighbours (sparse matrix).
+    idx = 1
     lz: do k = 1, FldSlv % whd(3)
-      idx = 1
       ly: do j = 1, FldSlv % whd(2)
         lx: do i = 1, FldSlv % whd(1)
           FldSlv % prhs(idx) = -scale * ( &
@@ -367,16 +401,16 @@ contains
                                         + FldSlv % u(3) % ReadVal(i  , j  , k+1)  &
                                         -sum(FldSlv % u % ReadVal(i  , j  , k  )) &
                                         )
-        idx = idx + 1
-      end do lx
-    end do ly
-  end do lz
+          idx = idx + 1
+        end do lx
+      end do ly
+    end do lz
   end subroutine BuildRhs3D
 
   subroutine InitFluid(FldSlv, names, whd, scale)
     implicit none
     character(len=*),  dimension(:), intent(in) :: names
-    integer,           intent(in)  :: whd(:) ! Width (i), height (j), depth (k)
+    integer           , intent(inout) :: whd(:) ! Width (i), height (j), depth (k)
     real(dp), optional, intent(in) :: scale
     class(FluidSlv),   intent(out) :: FldSlv ! Fluid
     real(dp), dimension(size(whd)) :: ost    ! Offset
@@ -414,6 +448,10 @@ contains
       call FldSlv % u(i) % init(trim(names(i+1)(1:len(names(i+1)))), TMPwhd, TMPost, celsiz)
     end do iv
 
+    ! Allocate whd (simulation bounds).
+    allocate (FldSlv % whd(ndim))
+    FldSlv % whd = whd
+
     ! Allocate the right hand side of pressure solve.
     allocate(FldSlv % prhs(pwhd))
     FldSlv % prhs = 0.
@@ -421,6 +459,8 @@ contains
     ! Allocate the pressure solution.
     allocate(FldSlv % p(pwhd))
     FldSlv % p = 0.
+
+    FldSlv % celsiz = celsiz
 
   end subroutine InitFluid
 
