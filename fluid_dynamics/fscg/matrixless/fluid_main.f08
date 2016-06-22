@@ -11,8 +11,6 @@ program fluid_main
   integer :: i, j, k
   real(dp) :: l, dummy
 
-  type(vec2d) :: xi
-
   allocate(FldQty(2))
 
   ! 2D
@@ -38,7 +36,7 @@ program fluid_main
   do j = 1, size(whd)
     do i = 1, size(whd)
       l = l + 1.
-      call FldQty(1) % WriteVal(i,j,l)
+      call FldQty(1) % WriteNewVal(i,j,l)
     end do
   end do
 
@@ -76,7 +74,7 @@ program fluid_main
       do i = 1, size(whd)
         l = l + 1.
         !print*, l
-        call FldQty(2) % WriteVal(i,j,k,l)
+        call FldQty(2) % WriteNewVal(i,j,k,l)
       end do
     end do
   end do
@@ -144,22 +142,21 @@ program fluid_main
 
   ! Testing write and read.
   l = 0.
-    do j = 1, nint(FldSlv % u(2) % whd(2))
-      do i = 1, nint(FldSlv % u(2) % whd(1))
+    do j = 1, FldSlv % u(2) % whd(2)
+      do i = 1, FldSlv % u(2) % whd(1)
         l = l + 1.
-        call FldSlv % u(2) % WriteVal(i,j,l)
+        call FldSlv % u(2) % WriteNewVal(i,j,l)
       end do
     end do
 
   call FldSlv % u(2) % UpdateVals
 
-    do j = 1, nint(FldSlv % u(2) % whd(2))
-      do i = 1, nint(FldSlv % u(2) % whd(1))
+    do j = 1, FldSlv % u(2) % whd(2)
+      do i = 1, FldSlv % u(2) % whd(1)
         print*, " [i, j] = ", [i, j], " Value = ", FldSlv % u(2) % ReadVal(i,j)
       end do
     end do
 
-    !xi % x = [0.5_dp,0.5_dp]
     print*, FldSlv % u(2) % Lerp(Vec2D([2._dp,0.5_dp]))
 
 end program fluid_main
