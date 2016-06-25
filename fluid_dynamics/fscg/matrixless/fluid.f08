@@ -51,6 +51,8 @@ module fluid
     procedure :: Init => InitFluid
     ! Build right hand side.
     procedure :: BuildRhs, BuildRhs2D, BuildRhs3D
+    ! Solve pressure.
+    procedure :: GSPSlv2D, GSPSlv3D
   end type FluidSlv
 
   type Vec2D
@@ -324,7 +326,7 @@ contains
 
     bounds: do i = 1, 3
       j = 2*i
-      ixi(j-1 : j) = floor( xi%x(j-1 : j) / FldQty % celsiz - FldQty % ost(i) )
+      ixi(j-1 : j) = floor( xi%x(j-1 : j) / FldQty % celsiz - FldQty % ost(i) ) + 1
     end do bounds
 
     ! Loop through z.
@@ -435,7 +437,7 @@ contains
 
           ! Building the matrix as a five-point stencil. Solid borders, i.e. no fluid is outside of the simulation bounds.
 
-          ! The pressure contribution for each cell depends on its 4 nearest neighbours.
+          ! The pressure contribution for each cell depends on its 4 nearest orthogonal neighbours.
           ! For example, cell a22 will receive contributions from cells a12, a23, a33 and a21.
           ! Boundary cells will only receive contributions from the orthogonally placed cells that are found within the simulation bounds. For example, cell a13 will only receive contributions from cells a12 and a23, while cell a21 from cells a11, a22 and a31. This leads to the series of if statements found herein.
 
@@ -486,8 +488,174 @@ contains
 
       if (Err < Derr) return
     end do iterl
-
   end subroutine GSPSlv2D
+
+  subroutine GSPSlv3D(FldSlv, h, MaxIt, DErr)
+    ! Gauss-Seidel pressure solve.
+    class(FluidSlv), intent(inout) :: FldSlv
+    real(dp)     , intent(in)    :: h      ! Timestep.
+    integer      , intent(in)    :: MaxIt  ! Maximum number of iterations.
+    real(dp)     , intent(in)    :: DErr   ! Desired error threshold.
+    real(dp)                     :: scale, Err ! Scaling factor, iteration error.
+    integer                      :: iter, i, j, k, idx ! Iteration, counters, index
+    real(dp)                     :: Diag, OffDiag ! Diagonal and offdiagonal elements of the matrix.
+    real(dp)                     :: NewP ! New pressure value.
+
+    ! Set scale.
+    scale = h / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+
+    ! ITERation Loop.
+    iterl: do iter = 1, MaxIt
+      Err = 0.
+      lz: do k = 1, FldSlv % whd(3)
+        ! Loop over y.
+        ly: do j = 1, FldSlv % whd(2)
+          ! Loop over x.
+          lx: do i = 1, FldSlv % whd(1)
+            idx     = i + FldSlv % whd(1)*(j-1) + FldSlv % whd(1) * FldSlv % whd(2)*(k-1)
+            Diag    = 0.
+            OffDiag = 0.
+
+            ! Building the matrix as a five-point stencil. Solid borders, i.e. no fluid is outside of the simulation bounds.
+
+            ! The pressure contribution for each cell depends on its 6 nearest othogonal neighbours.
+            ! For example, cell a22 will receive contributions from cells a12, a23, a33 and a21.
+            ! Boundary cells will only receive contributions from the orthogonally placed cells that are found within the simulation bounds. For example, cell a131 will only receive contributions from cells a121, a231 and a132, while cell a212 from cells a112, a222, a312, a211 and a213. This leads to the series of if statements found herein.
+
+            ! y-axis
+            ! ^   z-axis
+            ! | /
+            ! |__> x-axis
+            !
+            !                                 3 x 3 x 3 Cube
+            !     Front plane                  Middle plane                 Back plane
+            ! ----------------------      ----------------------      ----------------------
+            ! | a131 | a231 | a331 |      | a132 | a232 | a332 |      | a133 | a233 | a333 |
+            ! ----------------------      ----------------------      ----------------------
+            ! | a121 | a221 | a321 |      | a122 | a222 | a322 |      | a123 | a223 | a323 |
+            ! ----------------------      ----------------------      ----------------------
+            ! | a111 | a211 | a311 |      | a112 | a212 | a312 |      | a113 | a213 | a313 |
+            ! ----------------------      ----------------------      ----------------------
+            !                                        |
+            !                                        |
+            !                                        | Mapped to
+            !                                        |
+            !                                        v
+            ! [a111,a211,a311,a121,a221,a321,a131,a231,a331,a112,a212,a312,a122,a222,a322,a132,a232,a332,a113,a213,a313,a123,a223,a323,a133,a233,a333]
+
+            ! Exclude Lower X Bound (Exclude cells a11, a12, a13 in the diagram).
+            elxb: if (i > 1) then
+              Diag    = Diag + scale
+              OffDiag = OffDiag - scale * FldSlv % p(idx - 1)
+            end if elxb
+
+            ! Exclude Lower X Bound (Exclude cells a13, a23, a33 in the diagram).
+            euxb: if (i < FldSlv % whd(1)) then
+              Diag    = Diag + scale
+              OffDiag = OffDiag - scale * FldSlv % p(idx + 1)
+            end if euxb
+
+            ! Exclude Upper Y Bound (Exclude cells a11, a12, 9 in the diagram).
+            elyb: if (j > 1) then
+              Diag    = Diag + scale
+              OffDiag = OffDiag - scale * FldSlv % p(idx - FldSlv % whd(1))
+            end if elyb
+
+            ! Exclude Lower Y Bound (Exclude cells 1, 4, 7 in the diagram).
+            euyb: if (j < FldSlv % whd(2)) then
+              Diag    = Diag + scale
+              OffDiag = OffDiag - scale * FldSlv % p(idx + FldSlv % whd(1))
+            end if euyb
+
+            elzb: if (k > 1) then
+              Diag    = Diag + scFldQtyale
+              OffDiag = OffDiag - scale * FldSlv % p(idx - FldSlv % whd(1) * FldSlv % whd(2))
+            end if elzb
+
+            euzb: if (k < FldSlv % whd(3)) then
+              Diag    = Diag + scale
+              OffDiag = OffDiag - scale * FldSlv % p(idx + FldSlv % whd(1) * FldSlv % whd(2))
+            end if euzb
+
+            NewP = (FldSlv % prhs(idx) - OffDiag) / Diag
+
+            Err = max(Err, abs(FldSlv % p(idx) - NewP))
+
+            FldSlv % p(idx) = NewP
+
+          end do lx
+        end do ly
+      end do lz
+
+      if (Err < Derr) return
+    end do iterl
+  end subroutine GSPSlv3D
+
+  subroutine ApplyPressure2D(FldSlv, h)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    real(dp)       , intent(in)    :: h
+    real(dp)                       :: scale, sxp ! Scale, scale x pressure.
+    integer                        :: i, j, ip1, jp1, idx
+
+    scale = h / (FldSlv % srho * FldSlv % celsiz)
+
+    ! Applies pressure and updates the velocity field.
+    idx = 1
+    ly: do j = 1, FldSlv % whd(2)
+      lx: do i = 1, FldSlv % whd(1)
+        ip1 = i + 1
+        jp1 = j + 1
+        sxp = scale * FldSlv % p(idx)
+
+        call FldSlv % u % WriteOldVal(i, j, FldSlv % u % ReadVal(i,j) - sxp)
+        call FldSlv % u(1) % WriteOldVal(ip1, j, FldSlv % u(1) % ReadVal(ip1,j) + sxp)
+        call FldSlv % u(2) % WriteOldVal(i, jp1, FldSlv % u(2) % ReadVal(i,jp1) + sxp)
+        idx = idx + 1
+      end do lx
+    end do ly
+
+    ! Set boundary velocities to zero (conservation of mass, nothing comes in or goes out).
+
+    !                                at x \in [1, width] and y = height
+    !                                              Vy = 0
+    !
+    !                                           ^     ^     ^
+    !                                           |     |     |
+    !                             (x0,y1) ------------------------- (x1,y1)
+    !                                     |     |     |     |     |
+    !                                     |     v     v     v     |
+    !                                     |                       |
+    ! at x = 1 and y \in [1, height]  <---|--->               <---|--->  at x = 1 and y \in [1, height]
+    !            Vx = 0                   |                       |                 Vx = 0
+    !                                 <---|--->               <---|--->
+    !                                     |                       |
+    !                                     |     ^     ^     ^     |
+    !                                     |     |     |     |     |
+    !                             (x0,y0) ------------------------- (x1,y0)
+    !                                           |     |     |
+    !                                           v     v     v
+    !
+    !                                   at x \in [1, width] and y = 1
+    !                                              Vy = 0
+
+    ! Vertical boundaries.
+    vb: do j = 1, FldSlv % whd(2)
+      ! Lower x boundary.
+      call FldSlv % u(1) % WriteOldVal(1, j, 0._dp)
+      ! Upper x boundary
+      call FldSlv % u(1) % WriteOldVal(FldSlv % whd(1), j, 0._dp)
+    end do vb
+
+    ! Horizontal boundaries.
+    hb: do i = 1, FldSlv % whd(1)
+      ! Lower y boundary.
+      call FldSlv % u(2) % WriteOldVal(i, 1, 0._dp)
+      ! Upper y boundary
+      call FldSlv % u(2) % WriteOldVal(i, FldSlv % whd(2), 0._dp)
+    end do hb
+
+  end subroutine ApplyPressure2D
 
   subroutine InitFluid(FldSlv, names, whd, scale)
     implicit none
@@ -607,7 +775,7 @@ contains
     ReadVal3D = FldQty % old(idx)
   end function ReadVal3D
 
-  subroutine WriteNewVal2D(FldQty, i, j, NewVal)
+  elemental subroutine WriteNewVal2D(FldQty, i, j, NewVal)
     implicit none
     integer,         intent(in)    :: i, j
     real(dp),        intent(in)    :: NewVal
@@ -618,7 +786,7 @@ contains
     FldQty % new(idx) = NewVal
   end subroutine WriteNewVal2D
 
-  subroutine WriteNewVal3D(FldQty, i, j, k, NewVal)
+  elemental subroutine WriteNewVal3D(FldQty, i, j, k, NewVal)
     implicit none
     integer,         intent(in)    :: i, j, k
     real(dp),        intent(in)    :: NewVal
@@ -629,7 +797,7 @@ contains
     FldQty % new(idx) = NewVal
   end subroutine WriteNewVal3D
 
-  subroutine WriteOldVal2D(FldQty, i, j, NewVal)
+  elemental subroutine WriteOldVal2D(FldQty, i, j, NewVal)
     implicit none
     integer,         intent(in)    :: i, j
     real(dp),        intent(in)    :: NewVal
@@ -640,7 +808,7 @@ contains
     FldQty % old(idx) = NewVal
   end subroutine WriteOldVal2D
 
-  subroutine WriteOldVal3D(FldQty, i, j, k, NewVal)
+  elemental subroutine WriteOldVal3D(FldQty, i, j, k, NewVal)
     implicit none
     integer,         intent(in)    :: i, j, k
     real(dp),        intent(in)    :: NewVal
@@ -651,7 +819,7 @@ contains
     FldQty % old(idx) = NewVal
   end subroutine WriteOldVal3D
 
-  subroutine UpdateVals(FldQty)
+  elemental subroutine UpdateVals(FldQty)
     implicit none
     class(FluidQty), intent(inout) :: FldQty
     FldQty % old = FldQty % new

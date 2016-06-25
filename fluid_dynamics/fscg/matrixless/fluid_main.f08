@@ -159,9 +159,9 @@ program fluid_main
 
     print*, FldSlv % u(2) % Lerp(Vec2D([2._dp,0.5_dp]))
 
-    !do i = 1, 5
+    do i = 1, 5
       call FldSlv%BuildRhs
-    !end do
+    end do
     print*, FldSlv % prhs
 
 end program fluid_main
