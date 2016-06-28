@@ -164,4 +164,6 @@ program fluid_main
     end do
     print*, FldSlv % prhs
 
+    print*, dp
+
 end program fluid_main

@@ -39,13 +39,15 @@ module fluid
 
   type FluidSlv
     character(len=:), dimension(:), allocatable :: names ! Names of variables.
-    type(FluidQty) , allocatable :: u(:)   ! Velocities
-    type(FluidQty)               :: rho    ! Density array
-    integer        , allocatable :: whd(:) ! Width, height, depth
-    real(dp)                     :: celsiz ! Cell size.
-    real(dp)                     :: srho   ! Scalar (fluid) density.
-    real(dp)       , allocatable :: prhs(:)! Right hand side of pressure equation.
-    real(dp)       , allocatable :: p(:)   ! Pressure solution.
+    type(FluidQty) , allocatable :: u(:)     ! Velocities
+    type(FluidQty)               :: rho      ! Density array
+    integer        , allocatable :: whd(:)   ! Width, height, depth
+    real(dp)                     :: celsiz   ! Cell size.
+    real(dp)                     :: srho     ! Scalar (fluid) density.
+    real(dp)       , allocatable :: prhs(:)  ! Right hand side of pressure equation.
+    real(dp)       , allocatable :: p(:)     ! Pressure solution.
+    real(dp)                     :: TimeStep, MaxTimeStep, MinTimeStep ! Timesteps
+    real(dp)                     :: safety   ! Safety factor for timestep calculation
   contains
     ! Initialise type.
     procedure :: Init => InitFluid
@@ -92,6 +94,88 @@ contains
     Lerp1D = yi(1)*(1.0 - x) + yi(2)*x
 
   end function Lerp1D
+
+  subroutine MaxTimestep2D(FldSlv, t)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    real(dp)       , intent(in)    :: t ! Time
+    real(dp)                       :: MaxVel, RMSVel ! Max and Root-mean-squared (RMS) Velocity * sqrt(n) at the centre of the grid.
+    integer                        :: i, j   ! Counters
+    real(dp)                       :: ci, cj ! Center i, center j
+
+    MaxVel = 0.
+
+    ly: do j = 1, FldSlv % whd(2)
+      ! Half way to the next y-index.
+      cj = j + 0.5
+      lx: do i = 1, FldSlv % whd(1)
+        ! Half way to the next x-index.
+        ci = i + 0.5
+        ! Calculate the Root-mean-squared * sqrt(n). Dividing by sqrt(n) is unecessary because n >= 1.
+        RMSVel = sqrt( sum( FldSlv % u % Lerp(Vec2D([ci, cj])) * FldSlv % u % Lerp(Vec2D([ci, cj])) ) )
+        ! Compare to Maximal Velocity.
+        cmv: if (RMSVel > MaxVel) then
+          ! Update MaxVel
+          MaxVel = RMSVel
+        else cmv
+          cycle lx
+        end if cmv
+      end do lx
+    end do ly
+
+    ! Fluid should not flow through more than one cell per iteration.
+    FldSlv % TimeStep = FldSlv % safety * FldSlv % celsiz / MaxVel
+
+    ! Clamp Time Step to be within Reasonable Bounds.
+    ctsrb: if (FldSlv % TimeStep < FldSlv % MinTimeStep .or. t + FldSlv % TimeStep == t) then
+      FldSlv % TimeStep = FldSlv % MinTimeStep
+    else if (FldSlv % TimeStep > FldSlv % MaxTimeStep) then ctsrb
+      FldSlv % Timestep = (FldSlv % MinTimeStep + FldSlv % MaxTimeStep)/2.
+    end if ctsrb
+
+  end subroutine MaxTimestep2D
+
+  subroutine MaxTimestep3D(FldSlv, t)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    real(dp)       , intent(in)    :: t ! Time
+    real(dp)                       :: MaxVel, RMSVel ! Max and Root-mean-squared (RMS) Velocity * sqrt(n) at the centre of the grid.
+    integer                        :: i, j, k    ! Counters
+    real(dp)                       :: ci, cj, ck ! Center i, center j, center k
+
+    MaxVel = 0.
+
+    lz: do k = 1, FldSlv % whd(3)
+      ck = k + 0.5
+      ly: do j = 1, FldSlv % whd(2)
+        ! Half way to the next y-index.
+        cj = j + 0.5
+        lx: do i = 1, FldSlv % whd(1)
+          ! Half way to the next x-index.
+          ci = i + 0.5
+          ! Calculate the Root-mean-squared * sqrt(n). Dividing by sqrt(n) is unecessary because n >= 1.
+          RMSVel = sqrt( sum( FldSlv % u % Lerp(Vec3D([ci, cj, ck])) * FldSlv % u % Lerp(Vec3D([ci, cj, ck])) ) )
+          ! Compare to Maximal Velocity.
+          cmv: if (RMSVel > MaxVel) then
+            ! Update MaxVel
+            MaxVel = RMSVel
+          else cmv
+            cycle lx
+          end if cmv
+        end do lx
+      end do ly
+    end do lz
+
+    ! Fluid should not flow through more than one cell per iteration.
+    FldSlv % TimeStep = FldSlv % safety * FldSlv % celsiz / MaxVel
+
+    ! Clamp Time Step to be within Reasonable Bounds.
+    ctsrb: if (FldSlv % TimeStep < FldSlv % MinTimeStep .or. t + FldSlv % TimeStep == t) then
+      FldSlv % TimeStep = FldSlv % MinTimeStep
+    else if (FldSlv % TimeStep > FldSlv % MaxTimeStep) then ctsrb
+      FldSlv % Timestep = (FldSlv % MinTimeStep + FldSlv % MaxTimeStep)/2.
+    end if ctsrb
+  end subroutine MaxTimestep3D
 
   elemental function Lerp2D(FldQty, xi)
     implicit none
@@ -326,7 +410,7 @@ contains
 
     bounds: do i = 1, 3
       j = 2*i
-      ixi(j-1 : j) = floor( xi%x(j-1 : j) / FldQty % celsiz - FldQty % ost(i) ) + 1
+      ixi(j-1 : j) = floor( xi%x(j-1: j) / FldQty % celsiz - FldQty % ost(i) ) + 1
     end do bounds
 
     ! Loop through z.
@@ -410,19 +494,19 @@ contains
     end do lz
   end subroutine BuildRhs3D
 
-  subroutine GSPSlv2D(FldSlv, h, MaxIt, DErr)
+  subroutine GSPSlv2D(FldSlv, MaxIt, DErr)
     ! Gauss-Seidel pressure solve.
+    implicit none
     class(FluidSlv), intent(inout) :: FldSlv
-    real(dp)     , intent(in)    :: h      ! Timestep.
-    integer      , intent(in)    :: MaxIt  ! Maximum number of iterations.
-    real(dp)     , intent(in)    :: DErr   ! Desired error threshold.
-    real(dp)                     :: scale, Err ! Scaling factor, iteration error.
-    integer                      :: iter, i, j, idx ! Iteration, counters, index
-    real(dp)                     :: Diag, OffDiag ! Diagonal and offdiagonal elements of the matrix.
-    real(dp)                     :: NewP ! New pressure value.
+    integer        , intent(in)    :: MaxIt  ! Maximum number of iterations.
+    real(dp)       , intent(in)    :: DErr   ! Desired error threshold.
+    real(dp)                       :: scale, Err ! Scaling factor, iteration error.
+    integer                        :: iter, i, j, idx ! Iteration, counters, index
+    real(dp)                       :: Diag, OffDiag ! Diagonal and offdiagonal elements of the matrix.
+    real(dp)                       :: NewP ! New pressure value.
 
     ! Set scale.
-    scale = h / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+    scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
 
     ! ITERation Loop.
     iterl: do iter = 1, MaxIt
@@ -490,10 +574,10 @@ contains
     end do iterl
   end subroutine GSPSlv2D
 
-  subroutine GSPSlv3D(FldSlv, h, MaxIt, DErr)
+  subroutine GSPSlv3D(FldSlv, MaxIt, DErr)
     ! Gauss-Seidel pressure solve.
+    implicit none
     class(FluidSlv), intent(inout) :: FldSlv
-    real(dp)     , intent(in)    :: h      ! Timestep.
     integer      , intent(in)    :: MaxIt  ! Maximum number of iterations.
     real(dp)     , intent(in)    :: DErr   ! Desired error threshold.
     real(dp)                     :: scale, Err ! Scaling factor, iteration error.
@@ -502,7 +586,7 @@ contains
     real(dp)                     :: NewP ! New pressure value.
 
     ! Set scale.
-    scale = h / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+    scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
 
     ! ITERation Loop.
     iterl: do iter = 1, MaxIt
@@ -568,7 +652,7 @@ contains
             end if euyb
 
             elzb: if (k > 1) then
-              Diag    = Diag + scFldQtyale
+              Diag    = Diag + scale
               OffDiag = OffDiag - scale * FldSlv % p(idx - FldSlv % whd(1) * FldSlv % whd(2))
             end if elzb
 
@@ -591,33 +675,31 @@ contains
     end do iterl
   end subroutine GSPSlv3D
 
-  subroutine ApplyPressure2D(FldSlv, h)
+  subroutine ApplyPressure2D(FldSlv)
     implicit none
     class(FluidSlv), intent(inout) :: FldSlv
-    real(dp)       , intent(in)    :: h
     real(dp)                       :: scale, sxp ! Scale, scale x pressure.
     integer                        :: i, j, ip1, jp1, idx
 
-    scale = h / (FldSlv % srho * FldSlv % celsiz)
+    scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz)
 
     ! Applies pressure and updates the velocity field.
     idx = 1
     ly: do j = 1, FldSlv % whd(2)
+      ip1 = i + 1
       lx: do i = 1, FldSlv % whd(1)
-        ip1 = i + 1
         jp1 = j + 1
         sxp = scale * FldSlv % p(idx)
-
-        call FldSlv % u % WriteOldVal(i, j, FldSlv % u % ReadVal(i,j) - sxp)
-        call FldSlv % u(1) % WriteOldVal(ip1, j, FldSlv % u(1) % ReadVal(ip1,j) + sxp)
-        call FldSlv % u(2) % WriteOldVal(i, jp1, FldSlv % u(2) % ReadVal(i,jp1) + sxp)
+        call FldSlv % u % WriteOldVal(i, j, FldSlv % u % ReadVal(i, j) - sxp)
+        call FldSlv % u(1) % WriteOldVal(ip1, j  , FldSlv % u(1) % ReadVal(ip1, j  ) + sxp)
+        call FldSlv % u(2) % WriteOldVal(i  , jp1, FldSlv % u(2) % ReadVal(i  , jp1) + sxp)
         idx = idx + 1
       end do lx
     end do ly
 
     ! Set boundary velocities to zero (conservation of mass, nothing comes in or goes out).
 
-    !                                at x \in [1, width] and y = height
+    !                               at ix \in [1, width] and iy = height
     !                                              Vy = 0
     !
     !                                           ^     ^     ^
@@ -626,8 +708,8 @@ contains
     !                                     |     |     |     |     |
     !                                     |     v     v     v     |
     !                                     |                       |
-    ! at x = 1 and y \in [1, height]  <---|--->               <---|--->  at x = 1 and y \in [1, height]
-    !            Vx = 0                   |                       |                 Vx = 0
+    !at ix = 1 and iy \in [1, height] <---|--->               <---|--->  at ix = width and iy \in [1, height]
+    !            Vx = 0                   |                       |                   Vx = 0
     !                                 <---|--->               <---|--->
     !                                     |                       |
     !                                     |     ^     ^     ^     |
@@ -636,7 +718,7 @@ contains
     !                                           |     |     |
     !                                           v     v     v
     !
-    !                                   at x \in [1, width] and y = 1
+    !                                  at ix \in [1, width] and iy = 1
     !                                              Vy = 0
 
     ! Vertical boundaries.
@@ -656,6 +738,126 @@ contains
     end do hb
 
   end subroutine ApplyPressure2D
+
+  subroutine ApplyPressure3D(FldSlv)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    real(dp)                       :: scale, sxp ! Scale, scale x pressure.
+    integer                        :: i, j, k, ip1, jp1, kp1, idx
+
+    scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz)
+
+    ! Applies pressure and updates the velocity field.
+    idx = 1
+    lz: do k = 1, FldSlv % whd(3)
+      kp1 = k + 1
+      ly: do j = 1, FldSlv % whd(2)
+        jp1 = j + 1
+        lx: do i = 1, FldSlv % whd(1)
+          ip1 = i + 1
+          sxp = scale * FldSlv % p(idx)
+          ! Update velocity field.
+          call FldSlv % u % WriteOldVal(i, j, k, FldSlv % u % ReadVal(i, j, k) - sxp)
+          call FldSlv % u(1) % WriteOldVal(ip1, j  , k  , FldSlv % u(1) % ReadVal(ip1, j  , k  ) + sxp)
+          call FldSlv % u(2) % WriteOldVal(i  , jp1, k  , FldSlv % u(2) % ReadVal(i  , jp1, k  ) + sxp)
+          call FldSlv % u(3) % WriteOldVal(i  , j  , kp1, FldSlv % u(3) % ReadVal(i  , j  , kp1) + sxp)
+          idx = idx + 1
+        end do lx
+      end do ly
+    end do lz
+
+    ! Set boundary velocities to zero (conservation of mass, nothing comes in or goes out).
+    !        (x0,y1,z1)      -------------------------- (x1,y1,z1)
+    !                       /|                       /|
+    !                      / |        ^             / |
+    !                     /  |        | Vy = 0     /  |
+    !                    /   |        |    Vz = 0 /   |
+    !                   /    |        |     ↗    /    |
+    !                  /     |        |    /    /     |
+    !     (x0,y1,z0)  --------------------------      | (x1,y1,z0)
+    !                 |      |        v  /     |      |
+    !          Vx = 0 |      |          /      |      |  Vx = 0
+    !      <----------| ---------->    ↙  <----|----- ----------->
+    !                 |      |                 |      |
+    !                 |      |       ↗         |      |
+    !                 |      |      /          |      |
+    !      (x0,y0,z1) |      ------/-----------|------ (x1,y0,z1)
+    !                 |     /     /            |     /
+    !                 |    /     ↙   ^         |    /
+    !                 |   /  Vz = 0  | Vy = 0  |   /
+    !                 |  /           |         |  /
+    !                 | /                      | /
+    !                 |/             |         |/
+    !     (x0,y0,z0)  -------------------------- (x1,y0,z0)
+    !                                |
+    !                                v
+
+    !          XY Front Plane                         XY Back Plane
+    ! (x0,y1,z0) ----------- (x1,y1,z0)     (x0,y1,z1) ----------- (x1,y1,z1)
+    !            |         |                           |         |
+    !            |         |                           |         |
+    !            |         |                           |         |
+    ! (x0,y0,z0) ----------- (x1,y0,z0)     (x0,y0,z1) ----------- (x1,y0,z1)
+    ! Perpendicular velocity is Vz = u(3).
+    ! Front Plane: At iz = 1, x \in [1, width] and y \in [1, height], Vz = 0
+    ! Back Plane: At iz = depth, x \in [1, width] and y \in [1, height], Vz = 0
+
+    !           YZ Left Plane                        YZ Right Plane
+    ! (x0,y1,z1) ----------- (x0,y1,z0)     (x1,y1,z1) ----------- (x1,y1,z0)
+    !            |         |                           |         |
+    !            |         |                           |         |
+    !            |         |                           |         |
+    ! (x0,y0,z1) ----------- (x0,y0,z0)     (x1,y0,z1) ----------- (x1,y0,z0)
+    ! Perpendicular velocity is Vx = u(1).
+    ! Front Plane: At ix = 1, z \in [1, depth] and y \in [1, height], Vx = 0
+    ! Back Plane: At ix = width, z \in [1, depth] and y \in [1, height], Vx = 0
+
+    !          XZ Bottom Plane                        XZ Top Plane
+    ! (x0,y0,z1) ----------- (x1,y0,z1)     (x0,y1,z1) ----------- (x1,y1,z1)
+    !            |         |                           |         |
+    !            |         |                           |         |
+    !            |         |                           |         |
+    ! (x0,y0,z0) ----------- (x1,y0,z0)     (x0,y1,z0) ----------- (x1,y1,z0)
+    ! Perpendicular velocity is Vy = u(2).
+    ! Front Plane: At iy = 1, z \in [1, depth] and x \in [1, widht], Vy = 0
+    ! Back Plane: At iy = height, z \in [1, depth] and x \in [1, widht], Vy = 0
+
+    ! XY Plane Boundaries
+    ! Loop through y.
+    ly2: do j = 1, FldSlv % whd(2)
+      ! Loop through x.
+      lx2: do i = 1, FldSlv % whd(1)
+        ! Front XY plane (iz = 1)
+        call FldSlv % u(3) % WriteOldVal(i, j, 1, 0._dp)
+        ! Back XY plane (iz = whd(3))
+        call FldSlv % u(3) % WriteOldVal(i, j, FldSlv % whd(3), 0._dp)
+      end do lx2
+    end do ly2
+
+    ! YZ Plane Boundaries.
+    ! Loop through z.
+    lz2: do k = 1, FldSlv % whd(3)
+      ! Loop through y.
+      ly3: do j = 1, FldSlv % whd(2)
+        ! Left YZ plane (ix = 1)
+        call FldSlv % u(1) % WriteOldVal(1, j, k, 0._dp)
+        ! Right YZ plane (ix = whd(1))
+        call FldSlv % u(1) % WriteOldVal(FldSlv % whd(1), j, k, 0._dp)
+      end do ly3
+    end do lz2
+
+    ! XZ Plane Boundaries.
+    ! Loop through z.
+    lz3: do k = 1, FldSlv % whd(3)
+      ! Loop through x.
+      lx3: do i = 1, FldSlv % whd(1)
+        ! Bottom XZ plane (iy = 1)
+        call FldSlv % u(2) % WriteOldVal(i, 1, k, 0._dp)
+        ! Top XZ plane (iy = whd(2))
+        call FldSlv % u(2) % WriteOldVal(i, FldSlv % whd(2), k, 0._dp)
+      end do lx3
+    end do lz3
+  end subroutine ApplyPressure3D
 
   subroutine InitFluid(FldSlv, names, whd, scale)
     implicit none
