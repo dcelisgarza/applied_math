@@ -51,35 +51,41 @@ module fluid
   contains
     ! Initialise type.
     procedure :: Init => InitFluid
-    ! Build right hand side.
+    ! Add flow.
+    procedure :: InitFlow2D
+    ! Max time step.
+    procedure :: MaxTimestep2D, MaxTimestep3D
+    ! Build right hand side of pressure solution.
     procedure :: BuildRhs, BuildRhs2D, BuildRhs3D
     ! Solve pressure.
     procedure :: GSPSlv2D, GSPSlv3D
+    ! Write to file.
+    procedure :: WriteToFile
   end type FluidSlv
 
   type Vec2D
     real(dp) :: x(2)
   end type Vec2D
 
-  type FluidQty2D
-    type(FluidQty) :: FldQty(2)
-  end type FluidQty2D
-
   type Vec2D2
     real(dp) :: x(4)
   end type Vec2D2
+
+  type FluidQty2D
+    type(FluidQty) :: FldQty(2)
+  end type FluidQty2D
 
   type Vec3D
     real(dp) :: x(3)
   end type Vec3D
 
-  type FluidQty3D
-    type(FluidQty) :: FldQty(3)
-  end type FluidQty3D
-
   type Vec3D2
     real(dp) :: x(6)
   end type Vec3D2
+
+  type FluidQty3D
+    type(FluidQty) :: FldQty(3)
+  end type FluidQty3D
 
 contains
 
@@ -132,7 +138,6 @@ contains
     else if (FldSlv % TimeStep > FldSlv % MaxTimeStep) then ctsrb
       FldSlv % Timestep = (FldSlv % MinTimeStep + FldSlv % MaxTimeStep)/2.
     end if ctsrb
-
   end subroutine MaxTimestep2D
 
   subroutine MaxTimestep3D(FldSlv, t)
@@ -213,8 +218,6 @@ contains
                 ],                                 &
                 x(2)                               &
                           )
-
-
   end function Lerp2D
 
   elemental function Lerp3D(FldQty, xi)
@@ -355,7 +358,27 @@ contains
     end do lz
   end subroutine Advect3D
 
-  subroutine AddFlow2D(FldQty, xi, value)
+  subroutine InitFlow2D(FldSlv, xi, values)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    type(Vec2D2) , intent(in)    :: xi
+    real(dp)     , intent(in)    :: values(3) ! value(1) := density, value(2) = Vx, value(3) = Vy
+
+    call FldSlv % rho % AddFlow(xi, values(1))
+    call FldSlv % u(2:3) % AddFlow(xi, values(2:3))
+  end subroutine InitFlow2D
+
+  subroutine InitFlow3D(FldSlv, xi, values)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    type(Vec3D2) , intent(in)    :: xi
+    real(dp)     , intent(in)    :: values(4) ! value(1) := density, value(2) = Vx, value(3) = Vy, value(4) = Vz
+
+    call FldSlv % rho % AddFlow(xi, values(1))
+    call FldSlv % u(2:4) % AddFlow(xi, values(2:4))
+  end subroutine InitFlow3D
+
+  elemental subroutine AddFlow2D(FldQty, xi, value)
     implicit none
     class(FluidQty), intent(inout) :: FldQty
     type(Vec2D2)   , intent(in)    :: xi ! xi%x(1) = x0, xi%x(2) = x1, xi%x(3) = y0, xi%x(4) = y1
@@ -368,26 +391,25 @@ contains
     !         |         |
     ! (x0,y0) ----------- (x1,y0)
 
-    ! Set up the simulation boundaries.
+    ! Set up the simulation bounds.
     bounds: do i = 1, 2
       j = 2*i
-      ixi(j-1 : j) = floor( xi % x(j-1 : j) / FldQty % celsiz - FldQty % ost(i) ) + 1
+      ixi(j-1 : j) = nint( xi % x(j-1 : j) / FldQty % celsiz - FldQty % ost(i) )
     end do bounds
 
     ! Loop through y.
     ! Start from the maximum value between the desired y0 and 1 (for the cell index) up to the minimum value between the desired y1 and the simulation height.
-    ly: do j = max(ixi(3), 1), min( ixi(4), FldQty % whd(2) )
+    ly: do j = max(ixi(3), 1), min( ixi(4), FldQty % whd(2))
       ! Loop through x.
       ! Start from the maximum value between the desired x0 and 1 (for the cell index) up to the minimum value between the desired x1 and the simulation width.
-      lx: do i = max(ixi(1), 1), min( ixi(2), FldQty % whd(1) )
+      lx: do i = max(ixi(1), 1), min( ixi(2), FldQty % whd(1))
         ! Write value to old value.
         if ( abs(FldQty % ReadVal(i, j)) < abs(value) ) call FldQty % WriteOldVal(i,j,value)
       end do lx
     end do ly
-
   end subroutine AddFlow2D
 
-  subroutine AddFlow3D(FldQty, xi, value)
+  elemental subroutine AddFlow3D(FldQty, xi, value)
     implicit none
     class(FluidQty), intent(inout) :: FldQty
     type(Vec3D2)   , intent(in)    :: xi ! xi%x(1) = x0, xi%x(2) = x1, xi%x(3) = y0, xi%x(4) = y1, xi%x(5) = z0, xi%x(6) = z1
@@ -410,18 +432,18 @@ contains
 
     bounds: do i = 1, 3
       j = 2*i
-      ixi(j-1 : j) = floor( xi%x(j-1: j) / FldQty % celsiz - FldQty % ost(i) ) + 1
+      ixi(j-1 : j) = nint( xi%x(j-1: j) / FldQty % celsiz - FldQty % ost(i) )
     end do bounds
 
     ! Loop through z.
     ! Start from the maximum value between the desired z0 and 1 (for the cell index) up to the minimum value between the desired z1 and the simulation depth.
-    lz: do k = max(ixi(5), 1), min( ixi(6), FldQty % whd(3) )
+    lz: do k = max(ixi(5), 1), min( ixi(6) + 1, FldQty % whd(3) )
       ! Loop through y.
       ! Start from the maximum value between the desired y0 and 1 (for the cell index) up to the minimum value between the desired y1 and the simulation height.
-      ly: do j = max(ixi(3), 1), min( ixi(4), FldQty % whd(2) )
+      ly: do j = max(ixi(3), 1), min( ixi(4) + 1, FldQty % whd(2) )
         ! Loop through x.
         ! Start from the maximum value between the desired x0 and 1 (for the cell index) up to the minimum value between the desired x1 and the simulation width.
-        lx: do i = max(ixi(1), 1), min( ixi(2), FldQty % whd(1) )
+        lx: do i = max(ixi(1), 1), min( ixi(2) + 1, FldQty % whd(1) )
           ! Write value to old value.
           if ( abs(FldQty % ReadVal(i, j, k)) < abs(value) ) call FldQty % WriteOldVal(i, j, k, value)
         end do lx
@@ -437,7 +459,7 @@ contains
     integer, allocatable, save     :: ndim ! Number of dimensions.
 
     ! Allocate ndim and set its value to the number of dimensions.
-    if (.not. allocated(ndim)) allocate(ndim, source = size(FldSlv % u))
+    if (.not. allocated(ndim)) allocate(ndim, source = size(FldSlv % whd))
 
     ! Choose 3D or 2D.
     C2D3D: if (ndim == 2) then
@@ -506,16 +528,19 @@ contains
     real(dp)                       :: NewP ! New pressure value.
 
     ! Set scale.
+    FldSlv % TimeStep = 0.5
     scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+    print*, scale
 
     ! ITERation Loop.
     iterl: do iter = 1, MaxIt
       Err = 0.
       ! Loop over y.
+      idx = 0
       ly: do j = 1, FldSlv % whd(2)
         ! Loop over x.
         lx: do i = 1, FldSlv % whd(1)
-          idx     = i + FldSlv % whd(1)*(j-1)
+          idx     = idx + 1
           Diag    = 0.
           OffDiag = 0.
 
@@ -535,7 +560,7 @@ contains
           ! | a12 | a22 | a32 |     --------->   [a11,a21,a31,a12,a22,a32,a13,a23,a33]
           ! -------------------
           ! | a11 | a21 | a31 |
-          ! -------------------
+          ! -------------------scale
 
           ! Exclude Lower X Bound (Exclude cells a11, a12, a13 in the diagram).
           elxb: if (i > 1) then
@@ -591,12 +616,13 @@ contains
     ! ITERation Loop.
     iterl: do iter = 1, MaxIt
       Err = 0.
+      idx = 0
       lz: do k = 1, FldSlv % whd(3)
         ! Loop over y.
         ly: do j = 1, FldSlv % whd(2)
           ! Loop over x.
           lx: do i = 1, FldSlv % whd(1)
-            idx     = i + FldSlv % whd(1)*(j-1) + FldSlv % whd(1) * FldSlv % whd(2)*(k-1)
+            idx     = idx + 1
             Diag    = 0.
             OffDiag = 0.
 
@@ -756,7 +782,7 @@ contains
         lx: do i = 1, FldSlv % whd(1)
           ip1 = i + 1
           sxp = scale * FldSlv % p(idx)
-          ! Update velocity field.
+          ! Update velocity field.init
           call FldSlv % u % WriteOldVal(i, j, k, FldSlv % u % ReadVal(i, j, k) - sxp)
           call FldSlv % u(1) % WriteOldVal(ip1, j  , k  , FldSlv % u(1) % ReadVal(ip1, j  , k  ) + sxp)
           call FldSlv % u(2) % WriteOldVal(i  , jp1, k  , FldSlv % u(2) % ReadVal(i  , jp1, k  ) + sxp)
@@ -859,12 +885,13 @@ contains
     end do lz3
   end subroutine ApplyPressure3D
 
-  subroutine InitFluid(FldSlv, names, whd, scale)
+  subroutine InitFluid(FldSlv, names, whd, rho, scale)
     implicit none
-    character(len=*),  dimension(:), intent(in) :: names
-    integer           , intent(in) :: whd(:) ! Width (i), height (j), depth (k)
+    class(FluidSlv) , intent(out)  :: FldSlv ! Fluid
+    character(len=*), dimension(:), intent(in) :: names
+    integer         , intent(in)   :: whd(:) ! Width (i), height (j), depth (k)
+    real(dp)        , intent(in)   :: rho
     real(dp), optional, intent(in) :: scale
-    class(FluidSlv),   intent(out) :: FldSlv ! Fluid
     real(dp), dimension(size(whd)) :: ost    ! Offset
     real(dp), dimension(size(whd)) :: TMPost
     real(dp)                       :: celsiz ! Cell size
@@ -877,17 +904,20 @@ contains
     ndim = size(whd)
     pwhd = product(whd)
 
+    ! Set the fluid density.
+    FldSlv % srho = rho
+
     ! Cell size.
     if(present(scale) .eqv. .true.) then
-      celsiz = scale/minval(whd)
+      FldSlv % celsiz = scale/minval(whd)
     else
-      celsiz = 1./minval(whd)
+      FldSlv % celsiz = 1./minval(whd)
     endif
 
     ! Initialise density.
     ! Centered in the grid.
     ost    = 0.5
-    call FldSlv % rho % init(trim(names(1)(1:len(names(1)))), whd, ost, celsiz)
+    call FldSlv % rho % init(trim(names(1)(1:len(names(1)))), whd, ost, FldSlv % celsiz)
 
     ! Initialise velocities.
     ! Staggered on the grid.
@@ -897,7 +927,7 @@ contains
       TMPwhd(i) = whd(i) + 1
       TMPost    = ost
       TMPost(i) = ost(i) - 0.5
-      call FldSlv % u(i) % init(trim(names(i+1)(1:len(names(i+1)))), TMPwhd, TMPost, celsiz)
+      call FldSlv % u(i) % init(trim(names(i+1)(1:len(names(i+1)))), TMPwhd, TMPost, FldSlv % celsiz)
     end do iv
 
     ! Allocate whd (simulation bounds).
@@ -911,10 +941,6 @@ contains
     ! Allocate the pressure solution and give initial guess.
     allocate(FldSlv % p(pwhd))
     FldSlv % p = 0.
-
-    ! Cell size.
-    FldSlv % celsiz = celsiz
-
   end subroutine InitFluid
 
   subroutine InitFluidQty(FldQty, name, whd, ost, celsiz)
@@ -1027,5 +1053,54 @@ contains
     FldQty % old = FldQty % new
     FldQty % new = 0.
   end subroutine UpdateVals
+
+  subroutine WriteToFile(FldSlv, unit)
+    class(FluidSlv), intent(in)   :: FldSlv
+    integer, intent(in), optional :: unit
+    integer, allocatable, save    :: ndim
+
+    if(.not. allocated(ndim)) allocate(ndim, source = size(FldSlv % whd))
+
+    ! Check if Unit is Present.
+    cup: if (present(unit)) then
+      ! Select Unit.
+      su: select case (unit)
+        case (1) su
+          ! Print density.
+          open(unit=unit, file="density.dat", status="replace", access="stream")
+          write(unit) FldSlv % rho % old
+          close(unit=unit)
+        case (2)
+          ! Print velocities.
+          open(unit=unit, file="velocity.dat", status="replace", access="stream")
+          ! Loop through the Number of DIMensions.
+          lndim: do i = 1, ndim
+            write(unit) FldSlv % u(i) % old
+          end do lndim
+          close(unit=unit)
+        case (3)
+          ! Print pressures.
+          open(unit=unit, file="pressure.dat", status="replace", access="stream")
+          write(unit) FldSlv % p
+          close(unit=unit)
+      end select su
+    else cup
+      ! If unit is not present. Print everything.
+      open(unit=1, file="density.dat", status="replace", access="stream")
+      write(1) FldSlv % rho % old
+      close(unit=1)
+
+      open(unit=2, file="velocity.dat", status="replace", access="stream")
+      ! Loop through the Number of DIMensions.
+      lndim2: do i = 1, ndim
+        write(2) FldSlv % u(i) % old
+      end do lndim2
+      close(unit=2)
+
+      open(unit=3, file="pressure.dat", status="replace", access="stream")
+      write(3) FldSlv % p
+      close(unit=3)
+    end if cup
+  end subroutine WriteToFile
 
 end module fluid
