@@ -4,8 +4,8 @@ target2 = fluid.out
 objects1 = nrtype.o fluid.o test_fluid.o
 objects2 = nrtype.o fluid.o fluid_main.o
 f08comp = gfortran-6
-FCFLAGS = -g
-#FCFLAGS = -O2 -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
+FCFLAGS = -g -fimplicit-none  -Wall  -Wline-truncation  -Wcharacter-truncation  -Wsurprising  -Waliasing  -Wimplicit-interface  -Wunused-parameter  -fwhole-file  -fcheck=all  -std=f2008  -pedantic  -fbacktrace
+#FCFLAGS = -Ofast -funsafe-loop-optimizations -fmerge-all-constants
 # Makefile
 default: $(target2) $(target1)
 $(target1): $(objects1)
