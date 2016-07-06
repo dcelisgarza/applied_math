@@ -14,26 +14,34 @@ module fluid
     ! Initialise type.
     procedure :: Init => InitFluidQty
     ! Add fluid flow.
-    procedure :: AddFlow2D, AddFlow3D
+    procedure :: AddFlow2D
+    procedure :: AddFlow3D
     generic   :: AddFlow => AddFlow2D, AddFlow3D
     ! Read values.
-    procedure :: ReadVal2D, ReadVal3D
+    procedure :: ReadVal2D
+    procedure :: ReadVal3D
     generic   :: ReadVal => ReadVal2D, ReadVal3D
     ! Write values.
-    procedure :: WriteNewVal2D, WriteNewVal3D
+    procedure :: WriteNewVal2D
+    procedure :: WriteNewVal3D
     generic   :: WriteNewVal => WriteNewVal2D, WriteNewVal3D
-    procedure :: WriteOldVal2D, WriteOldVal3D
+    procedure :: WriteOldVal2D
+    procedure :: WriteOldVal3D
     generic   :: WriteOldVal => WriteOldVal2D, WriteOldVal3D
     ! Update values.
     procedure :: UpdateVals
     ! Linear interpolate.
-    procedure :: Lerp1D, Lerp2D, Lerp3D
+    procedure :: Lerp1D
+    procedure :: Lerp2D
+    procedure :: Lerp3D
     generic   :: Lerp => Lerp1D, Lerp2D, Lerp3D
     ! Integrate.
-    procedure :: FEulerVel2D, FEulerVel3D
+    procedure :: FEulerVel2D
+    procedure :: FEulerVel3D
     generic   :: FEuler => FEulerVel2D, FEulerVel3D
     ! Advect.
-    procedure :: Advect2D, Advect3D
+    procedure :: Advect2D
+    procedure :: Advect3D
     generic   :: Advect => Advect2D, Advect3D
   end type FluidQty
 
@@ -51,14 +59,28 @@ module fluid
     ! Initialise type.
     procedure :: Init => InitFluid
     ! Add flow.
-    procedure :: InitFlow2D, InitFlow3D
+    procedure :: InitFlow2D
+    procedure :: InitFlow3D
     generic   :: AddFlow => InitFlow2D, InitFlow3D
     ! Max time step.
-    procedure :: MaxTimestep2D, MaxTimestep3D
+    procedure :: MaxTimestep2D
+    procedure :: MaxTimestep3D
     ! Build right hand side of pressure solution.
-    procedure :: BuildRhs, BuildRhs2D, BuildRhs3D
+    procedure :: BuildRhs2D
+    procedure :: BuildRhs3D
     ! Solve pressure.
-    procedure :: GSPSlv2D, GSPSlv3D
+    procedure :: GSPSlv2D
+    procedure :: GSPSlv3D
+    ! Apply pressure.
+    procedure :: ApplyPressure2D, ApplyPressure3D
+    ! Write values.
+    procedure :: WriteArray2D
+    procedure :: WriteArray3D
+    generic   :: WriteArray => WriteArray2D, WriteArray3D
+    !Read values.
+    procedure :: ReadArray2D
+    procedure :: ReadArray3D
+    generic   :: ReadArray => ReadArray2D, ReadArray3D
     ! Write to file.
     procedure :: WriteToFile
   end type FluidSlv
@@ -103,19 +125,27 @@ contains
     real(dp), dimension(size(whd)) :: ost    ! Offset
     real(dp), dimension(size(whd)) :: TMPost
     integer                        :: ndim   ! Number of dimensions
-    integer                        :: pwhd   ! Product of the dimensions
-    integer, dimension(size(whd))  :: TMPwhd ! whd for each different quantity
+    integer                        :: ncells ! Number of cells
+    integer, dimension(size(whd))  :: TMncells ! Number of cells for each different quantity
     integer                        :: i      ! Counter
 
     ! Number of dimensions.
     ndim = size(whd)
-    pwhd = product(whd)
+    ncells = product(whd) - 1
 
     ! Set the fluid density.
     FldSlv % srho = rho
 
     ! Set initial time step.
-    FldSlv % timestep = timestep
+    FldSlv % TimeStep = timestep
+    if(present(safety) .eqv. .true.) then
+      FldSlv % MinTimeStep = timestep * safety * 1d-3
+      FldSlv % MaxTimeStep = timestep * safety * 1d+3
+    else
+      FldSlv % MinTimeStep = timestep * 0.8_dp * 1d-3
+      FldSlv % MaxTimeStep = timestep * 0.8_dp * 1d+3
+    end if
+
 
     ! Cell size.
     if(present(scale) .eqv. .true.) then
@@ -140,11 +170,11 @@ contains
     ! Staggered on the grid.
     allocate(FldSlv % u(ndim))
     iv: do i = 1, ndim
-      TMPwhd    = whd
-      TMPwhd(i) = whd(i) + 1
+      TMncells    = whd
+      TMncells(i) = whd(i) + 1
       TMPost    = ost
       TMPost(i) = ost(i) - 0.5
-      call FldSlv % u(i) % init(trim(names(i+1)(1:len(names(i+1)))), TMPwhd, TMPost, FldSlv % celsiz)
+      call FldSlv % u(i) % init(trim(names(i+1)(1:len(names(i+1)))), TMncells, TMPost, FldSlv % celsiz)
     end do iv
 
     ! Allocate whd (simulation bounds).
@@ -152,12 +182,14 @@ contains
     FldSlv % whd = whd
 
     ! Allocate the right hand side of pressure solve.
-    allocate(FldSlv % prhs(pwhd))
-    FldSlv % prhs = 0.
+    allocate(FldSlv % prhs(0:ncells))
+    !dir$ loop count min(256)
+    FldSlv % prhs = 0._dp
 
     ! Allocate the pressure solution and give initial guess.
-    allocate(FldSlv % p(pwhd))
-    FldSlv % p = 0.
+    allocate(FldSlv % p(0:ncells))
+    !dir$ loop count min(256)
+    FldSlv % p = 0._dp
   end subroutine InitFluid
 !==============================================================================!
 
@@ -192,9 +224,11 @@ contains
     FldQty % ost = ost
 
     ! Allocate values.
-    ncells = product(whd)
-    allocate(FldQty % old(ncells), FldQty % new(ncells))
+    ncells = product(whd) - 1
+    allocate(FldQty % old(0:ncells), FldQty % new(0:ncells))
+    !dir$ loop count min(512)
     FldQty % old = 0.
+    !dir$ loop count min(512)
     FldQty % new = 0.
 
     ! Cell size
@@ -206,7 +240,7 @@ contains
   ! Initialise flow.
   ! Adds the respective quantities inside the box bounded by the coordinates xi%x.
   ! Tested: 2D
-  subroutine InitFlow2D(FldSlv, xi, values)
+  pure subroutine InitFlow2D(FldSlv, xi, values)
     implicit none
     class(FluidSlv), intent(inout) :: FldSlv
     type(Vec2D2)   , intent(in)    :: xi        ! Coordinates for the vertices of the 2D box.
@@ -216,7 +250,7 @@ contains
     call FldSlv % u(1:2) % AddFlow(xi, values(2:3))
   end subroutine InitFlow2D
 
-  subroutine InitFlow3D(FldSlv, xi, values)
+  pure subroutine InitFlow3D(FldSlv, xi, values)
     implicit none
     class(FluidSlv), intent(inout) :: FldSlv
     type(Vec3D2)   , intent(in)    :: xi        ! Coordinates for the vertices of the 3D box.
@@ -235,7 +269,7 @@ contains
     class(FluidQty), intent(inout) :: FldQty
     type(Vec2D2)   , intent(in)    :: xi ! xi%x(1) = x0, xi%x(2) = x1, xi%x(3) = y0, xi%x(4) = y1
     real(dp)       , intent(in)    :: value
-    integer                        :: i, j, ixi(4)
+    integer                        :: i, j, ixi(4), idx
 
     ! (x0,y1) ----------- (x1,y1)
     !         |         |
@@ -244,7 +278,7 @@ contains
     ! (x0,y0) ----------- (x1,y0)
 
     ! Set up the simulation bounds.
-    bounds: do i = 1, 2
+    bounds: do concurrent (i = 1: 2)
       j = 2*i
       ! Using fortran's standard indexing we need to add 1 to the coordinates if we want to properly account for zero.
       ixi(j-1 : j) = aint( (xi % x(j-1 : j) ) / FldQty % celsiz - FldQty % ost(i) )
@@ -252,12 +286,13 @@ contains
 
     ! Loop through y.
     ! Start from the maximum value between the desired y0 and 1 (for the cell index) up to the minimum value between the desired y1 and the simulation height.
-    ly: do j = max(ixi(3) + 1, 1), min( ixi(4), FldQty % whd(2) )
+    ly: do concurrent (j = max(ixi(3), 0): min( ixi(4), FldQty % whd(2)) - 1)
       ! Loop through x.
       ! Start from the maximum value between the desired x0 and 1 (for the cell index) up to the minimum value between the desired x1 and the simulation width.
-      lx: do i = max(ixi(1) + 1, 1), min( ixi(2), FldQty % whd(1) )
+      lx: do concurrent (i = max(ixi(1), 0): min( ixi(2), FldQty % whd(1)) - 1)
         ! Write value to old value.
-        if ( abs(FldQty % ReadVal(i, j)) < abs(value) ) call FldQty % WriteOldVal(i,j,value)
+        idx = i + FldQty % whd(1)*j
+        if ( abs(FldQty % old(idx)) < abs(value) ) FldQty % old(idx) = value
       end do lx
     end do ly
   end subroutine AddFlow2D
@@ -269,7 +304,7 @@ contains
     class(FluidQty), intent(inout) :: FldQty
     type(Vec3D2)   , intent(in)    :: xi ! xi%x(1) = x0, xi%x(2) = x1, xi%x(3) = y0, xi%x(4) = y1, xi%x(5) = z0, xi%x(6) = z1
     real(dp)       , intent(in)    :: value
-    integer                        :: i, j, k, ixi(6)
+    integer                        :: i, j, k, ixi(6), idx
 
     ! This is the simulation domain.
     !
@@ -285,22 +320,23 @@ contains
     !             |/          |/
     ! (x0,y0,z0)  ------------- (x1,y0,z0)
 
-    bounds: do i = 1, 3
+    bounds: do concurrent (i = 1: 3)
       j = 2*i
       ixi(j-1 : j) = aint( (xi % x(j-1 : j) ) / FldQty % celsiz - FldQty % ost(i) )
     end do bounds
 
     ! Loop through z.
     ! Start from the maximum value between the desired z0 and 1 (for the cell index) up to the minimum value between the desired z1 and the simulation depth.
-    lz: do k = max(ixi(5) + 1, 1), min( ixi(6), FldQty % whd(3) )
+    lz: do concurrent (k = max(ixi(5), 0): min(ixi(6), FldQty % whd(3)) - 1)
       ! Loop through y.
       ! Start from the maximum value between the desired y0 and 1 (for the cell index) up to the minimum value between the desired y1 and the simulation height.
-      ly: do j = max(ixi(3) + 1, 1), min( ixi(4), FldQty % whd(2) )
+      ly: do concurrent (j = max(ixi(3), 0): min(ixi(4), FldQty % whd(2)) - 1)
         ! Loop through x.
         ! Start from the maximum value between the desired x0 and 1 (for the cell index) up to the minimum value between the desired x1 and the simulation width.
-        lx: do i = max(ixi(1) + 1, 1), min( ixi(2), FldQty % whd(1) )
+        lx: do concurrent (i = max(ixi(1), 0): min(ixi(2), FldQty % whd(1)) - 1)
           ! Write value to old value.
-          if ( abs(FldQty % ReadVal(i, j, k)) < abs(value) ) call FldQty % WriteOldVal(i, j, k, value)
+          idx = i + FldQty % whd(1)*j + FldQty % whd(2)*k
+          if ( abs(FldQty % old(idx)) < abs(value) ) FldQty % old(idx) = value
         end do lx
       end do ly
     end do lz
@@ -308,7 +344,7 @@ contains
 !==============================================================================!
 
 !==============================================================================!
-! Tested 2D.
+! Tested: 2D.
   subroutine BuildRhs(FldSlv)
     ! Build Rhs wrapper subroutine.
     ! The actual subroutines build the pressure solution via the negative of the divergence as a forward finite difference (truly horrible). This is not the best way to go about doing this, but it will be fixed in the future.
@@ -329,6 +365,7 @@ contains
   !==============================================================================!
 
   !==============================================================================!
+  ! Tested: 2D
   pure subroutine BuildRhs2D(FldSlv)
     implicit none
     class(FluidSlv), intent(inout) :: FldSlv
@@ -336,15 +373,15 @@ contains
     integer                        :: i, j, idx ! Counters and index.
 
     ! Calculate the scale.
-    scale =  1./FldSlv % celsiz
+    scale =  1._dp/FldSlv % celsiz
 
-    idx = 1
-    ly: do j = 1, FldSlv % whd(2)
-      lx: do i = 1, FldSlv % whd(1)
+    idx = 0
+    ly: do j = 0, FldSlv % whd(2) - 1
+      lx: do i = 0, FldSlv % whd(1) - 1
         FldSlv % prhs(idx) = -scale * (                                     &
                                          FldSlv % u(1) % ReadVal(i+1, j  )  &
                                        + FldSlv % u(2) % ReadVal(i  , j+1)  &
-                                       -sum(FldSlv % u % ReadVal(i  , j  )) &
+                                       - sum(FldSlv % u % ReadVal(i , j  )) &
                                       )
         idx = idx + 1
       end do lx
@@ -360,17 +397,16 @@ contains
     integer                        :: i, j, k, idx ! Counters and index.
 
     ! Calculate the scale.
-    scale =  1./FldSlv % celsiz
-
-    idx = 1
-    lz: do k = 1, FldSlv % whd(3)
-      ly: do j = 1, FldSlv % whd(2)
-        lx: do i = 1, FldSlv % whd(1)
-          FldSlv % prhs(idx) = -scale * (                                          &
+    scale =  1._dp/FldSlv % celsiz
+    idx = 0
+    lz: do k = 0, FldSlv % whd(3) - 1
+      ly: do j = 0, FldSlv % whd(2) - 1
+        lx: do i = 0, FldSlv % whd(1) - 1
+          FldSlv % prhs(idx) = -scale * (              &
                                            FldSlv % u(1) % ReadVal(i+1, j  , k  )  &
                                          + FldSlv % u(2) % ReadVal(i  , j+1, k  )  &
                                          + FldSlv % u(3) % ReadVal(i  , j  , k+1)  &
-                                         -sum(FldSlv % u % ReadVal(i  , j  , k  )) &
+                                         - sum(FldSlv % u % ReadVal(i , j  , k  )) &
                                         )
           idx = idx + 1
         end do lx
@@ -380,7 +416,7 @@ contains
   !==============================================================================!
 
   !==============================================================================!
-  ! Tested 2D.
+  ! Tested: 2D.
   subroutine GSPSlv2D(FldSlv, MaxIt, DErr)
     ! Gauss-Seidel pressure solve.
     implicit none
@@ -391,20 +427,23 @@ contains
     integer                        :: iter, i, j, idx ! Iteration, counters, index
     real(dp)                       :: Diag, OffDiag ! Diagonal and offdiagonal elements of the matrix.
     real(dp)                       :: NewP ! New pressure value.
+    integer                        :: AuxWHD(2)
 
     ! Set scale.
-    scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+    scale  = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+    ! Set range for loops.
+    AuxWHD = FldSlv % whd - 1
 
     ! ITERation Loop.
     iterl: do iter = 1, MaxIt
-      Err = 0.
+      Err = 0._dp
       ! Loop over y.
-      idx = 1
-      ly: do j = 1, FldSlv % whd(2)
+      idx = 0
+      ly: do j = 0, AuxWHD(2)
         ! Loop over x.
-        lx: do i = 1, FldSlv % whd(1)
-          Diag    = 0.
-          OffDiag = 0.
+        lx: do i = 0, AuxWHD(1)
+          Diag    = 0._dp
+          OffDiag = 0._dp
 
           ! Building the matrix as a five-point stencil. Solid borders, i.e. no fluid is outside of the simulation bounds.
 
@@ -425,25 +464,25 @@ contains
           ! -------------------scale
 
           ! Exclude Lower X Bound (Exclude cells a11, a12, a13 in the diagram).
-          elxb: if (i > 1) then
+          elxb: if (i > 0) then
             Diag    = Diag + scale
             OffDiag = OffDiag - scale * FldSlv % p(idx - 1)
           end if elxb
 
           ! Exclude Lower X Bound (Exclude cells a13, a23, a33 in the diagram).
-          euxb: if (i < FldSlv % whd(1)) then
+          euxb: if (i < AuxWHD(1)) then
             Diag    = Diag + scale
             OffDiag = OffDiag - scale * FldSlv % p(idx + 1)
           end if euxb
 
           ! Exclude Upper Y Bound (Exclude cells a11, a12, 9 in the diagram).
-          elyb: if (j > 1) then
+          elyb: if (j > 0) then
             Diag    = Diag + scale
             OffDiag = OffDiag - scale * FldSlv % p(idx - FldSlv % whd(1))
           end if elyb
 
           ! Exclude Lower Y Bound (Exclude cells 1, 4, 7 in the diagram).
-          euyb: if (j < FldSlv % whd(2)) then
+          euyb: if (j < AuxWHD(2)) then
             Diag    = Diag + scale
             OffDiag = OffDiag - scale * FldSlv % p(idx + FldSlv % whd(1))
           end if euyb
@@ -460,7 +499,9 @@ contains
       if (Err < Derr) return
     end do iterl
   end subroutine GSPSlv2D
+!==============================================================================!
 
+!==============================================================================!
   subroutine GSPSlv3D(FldSlv, MaxIt, DErr)
     ! Gauss-Seidel pressure solve.
     implicit none
@@ -471,21 +512,24 @@ contains
     integer                      :: iter, i, j, k, idx ! Iteration, counters, index
     real(dp)                     :: Diag, OffDiag ! Diagonal and offdiagonal elements of the matrix.
     real(dp)                     :: NewP ! New pressure value.
+    integer                      :: AuxWHD(3)
 
     ! Set scale.
-    scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+    scale  = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz * FldSlv % celsiz)
+    ! Set range for loops.
+    AuxWHD = FldSlv % whd - 1
 
     ! ITERation Loop.
     iterl: do iter = 1, MaxIt
-      Err = 0.
-      idx = 1
-      lz: do k = 1, FldSlv % whd(3)
+      Err = 0._dp
+      idx = 0
+      lz: do k = 0, AuxWHD(3)
         ! Loop over y.
-        ly: do j = 1, FldSlv % whd(2)
+        ly: do j = 0, AuxWHD(2)
           ! Loop over x.
-          lx: do i = 1, FldSlv % whd(1)
-            Diag    = 0.
-            OffDiag = 0.
+          lx: do i = 0, AuxWHD(1)
+            Diag    = 0._dp
+            OffDiag = 0._dp
 
             ! Building the matrix as a five-point stencil. Solid borders, i.e. no fluid is outside of the simulation bounds.
 
@@ -515,35 +559,35 @@ contains
             ! [a111,a211,a311,a121,a221,a321,a131,a231,a331,a112,a212,a312,a122,a222,a322,a132,a232,a332,a113,a213,a313,a123,a223,a323,a133,a233,a333]
 
             ! Exclude Lower X Bound (Exclude cells a11, a12, a13 in the diagram).
-            elxb: if (i > 1) then
+            elxb: if (i > 0) then
               Diag    = Diag + scale
               OffDiag = OffDiag - scale * FldSlv % p(idx - 1)
             end if elxb
 
             ! Exclude Lower X Bound (Exclude cells a13, a23, a33 in the diagram).
-            euxb: if (i < FldSlv % whd(1)) then
+            euxb: if (i < AuxWHD(1)) then
               Diag    = Diag + scale
               OffDiag = OffDiag - scale * FldSlv % p(idx + 1)
             end if euxb
 
             ! Exclude Upper Y Bound (Exclude cells a11, a12, 9 in the diagram).
-            elyb: if (j > 1) then
+            elyb: if (j > 0) then
               Diag    = Diag + scale
               OffDiag = OffDiag - scale * FldSlv % p(idx - FldSlv % whd(1))
             end if elyb
 
             ! Exclude Lower Y Bound (Exclude cells 1, 4, 7 in the diagram).
-            euyb: if (j < FldSlv % whd(2)) then
+            euyb: if (j < AuxWHD(2)) then
               Diag    = Diag + scale
               OffDiag = OffDiag - scale * FldSlv % p(idx + FldSlv % whd(1))
             end if euyb
 
-            elzb: if (k > 1) then
+            elzb: if (k > 0) then
               Diag    = Diag + scale
               OffDiag = OffDiag - scale * FldSlv % p(idx - FldSlv % whd(1) * FldSlv % whd(2))
             end if elzb
 
-            euzb: if (k < FldSlv % whd(3)) then
+            euzb: if (k < AuxWHD(3)) then
               Diag    = Diag + scale
               OffDiag = OffDiag - scale * FldSlv % p(idx + FldSlv % whd(1) * FldSlv % whd(2))
             end if euzb
@@ -553,7 +597,7 @@ contains
             Err = max(Err, abs(FldSlv % p(idx) - NewP))
 
             FldSlv % p(idx) = NewP
-            idx     = idx + 1
+            idx = idx + 1
           end do lx
         end do ly
       end do lz
@@ -561,7 +605,10 @@ contains
       if (Err < Derr) return
     end do iterl
   end subroutine GSPSlv3D
+!==============================================================================!
 
+!==============================================================================!
+! Tested: 1D, 2D, 3D.
   pure function Lerp1D(FldQty, yi, x)
     ! Linear intERPolate in 1D.
     ! 1D interpolation between yi(1) < y < yi(4) for 0 < x < 1
@@ -570,91 +617,11 @@ contains
     real(dp)       , intent(in) :: yi(2), x
     real(dp)                    :: lerp1d
 
-    Lerp1D = yi(1)*(1.0 - x) + yi(2)*x
-
+    Lerp1D = yi(1)*(1._dp - x) + yi(2)*x
   end function Lerp1D
+!==============================================================================!
 
-  subroutine MaxTimestep2D(FldSlv, t)
-    implicit none
-    class(FluidSlv), intent(inout) :: FldSlv
-    real(dp)       , intent(in)    :: t ! Time
-    real(dp)                       :: MaxVel, RMSVel ! Max and Root-mean-squared (RMS) Velocity * sqrt(n) at the centre of the grid.
-    integer                        :: i, j   ! Counters
-    real(dp)                       :: ci, cj ! Center i, center j
-
-    MaxVel = 0.
-
-    ly: do j = 1, FldSlv % whd(2)
-      ! Half way to the next y-index.
-      cj = j + 0.5
-      lx: do i = 1, FldSlv % whd(1)
-        ! Half way to the next x-index.
-        ci = i + 0.5
-        ! Calculate the Root-mean-squared * sqrt(n). Dividing by sqrt(n) is unecessary because n >= 1.
-        RMSVel = sqrt( sum( FldSlv % u % Lerp(Vec2D([ci, cj])) * FldSlv % u % Lerp(Vec2D([ci, cj])) ) )
-        ! Compare to Maximal Velocity.
-        cmv: if (RMSVel > MaxVel) then
-          ! Update MaxVel
-          MaxVel = RMSVel
-        else cmv
-          cycle lx
-        end if cmv
-      end do lx
-    end do ly
-
-    ! Fluid should not flow through more than one cell per iteration.
-    FldSlv % TimeStep = FldSlv % safety * FldSlv % celsiz / MaxVel
-
-    ! Clamp Time Step to be within Reasonable Bounds.
-    ctsrb: if (FldSlv % TimeStep < FldSlv % MinTimeStep .or. t + FldSlv % TimeStep == t) then
-      FldSlv % TimeStep = FldSlv % MinTimeStep
-    else if (FldSlv % TimeStep > FldSlv % MaxTimeStep) then ctsrb
-      FldSlv % Timestep = (FldSlv % MinTimeStep + FldSlv % MaxTimeStep)/2.
-    end if ctsrb
-  end subroutine MaxTimestep2D
-
-  subroutine MaxTimestep3D(FldSlv, t)
-    implicit none
-    class(FluidSlv), intent(inout) :: FldSlv
-    real(dp)       , intent(in)    :: t ! Time
-    real(dp)                       :: MaxVel, RMSVel ! Max and Root-mean-squared (RMS) Velocity * sqrt(n) at the centre of the grid.
-    integer                        :: i, j, k    ! Counters
-    real(dp)                       :: ci, cj, ck ! Center i, center j, center k
-
-    MaxVel = 0.
-
-    lz: do k = 1, FldSlv % whd(3)
-      ck = k + 0.5
-      ly: do j = 1, FldSlv % whd(2)
-        ! Half way to the next y-index.
-        cj = j + 0.5
-        lx: do i = 1, FldSlv % whd(1)
-          ! Half way to the next x-index.
-          ci = i + 0.5
-          ! Calculate the Root-mean-squared * sqrt(n). Dividing by sqrt(n) is unecessary because n >= 1.
-          RMSVel = sqrt( sum( FldSlv % u % Lerp(Vec3D([ci, cj, ck])) * FldSlv % u % Lerp(Vec3D([ci, cj, ck])) ) )
-          ! Compare to Maximal Velocity.
-          cmv: if (RMSVel > MaxVel) then
-            ! Update MaxVel
-            MaxVel = RMSVel
-          else cmv
-            cycle lx
-          end if cmv
-        end do lx
-      end do ly
-    end do lz
-
-    ! Fluid should not flow through more than one cell per iteration.
-    FldSlv % TimeStep = FldSlv % safety * FldSlv % celsiz / MaxVel
-
-    ! Clamp Time Step to be within Reasonable Bounds.
-    ctsrb: if (FldSlv % TimeStep < FldSlv % MinTimeStep .or. t + FldSlv % TimeStep == t) then
-      FldSlv % TimeStep = FldSlv % MinTimeStep
-    else if (FldSlv % TimeStep > FldSlv % MaxTimeStep) then ctsrb
-      FldSlv % Timestep = (FldSlv % MinTimeStep + FldSlv % MaxTimeStep)/2.
-    end if ctsrb
-  end subroutine MaxTimestep3D
-
+!==============================================================================!
   elemental function Lerp2D(FldQty, xi)
     implicit none
     class(FluidQty), intent(in) :: FldQty
@@ -663,7 +630,7 @@ contains
     real(dp)                    :: x(2)
     integer                     :: ix(2)
     real(dp)                    :: VtxVal(4) ! VALues at cell VERtices. VtxVal(1) = x00, VtxVal(2) = x10, VtxVal(3) = x01, VtxVal(4) = x11
-    integer, parameter          :: ivtc(8) = [0,1,0,1,0,0,1,1] + 1 ! Index array of the cell vertex displacements.
+    integer, parameter          :: ivtc(8) = [0,1,0,1,0,0,1,1] ! Index array of the cell vertex displacements.
 
     ! x01   -----------   x11
     !       |         |
@@ -672,15 +639,15 @@ contains
     ! x00   -----------   x10
 
     ! Clamp coordinates to the boundaries.
-    x = min( max(xi % x - FldQty % ost(1:2), 0._dp), real(FldQty % whd(1:2),dp) )
+    x = min( max(xi % x - FldQty % ost(1:2), 0._dp), real(FldQty % whd(1:2) - 1.001_dp, dp) )
 
     ! Prepare interpolation values.
-    ix = floor( x )
+    ix = aint( x )
     ! We make sure 0 < x < 1
     x  = x - ix
 
     ! Values at vertices.
-    VtxVal(1:4) = FldQty % ReadVal(ix(1) + ivtc(1:4), ix(2) + ivtc(5:8))
+    VtxVal = FldQty % ReadVal(ix(1) + ivtc(1:4), ix(2) + ivtc(5:8))
 
     Lerp2D = FldQty % Lerp(                        &
                 [                                  &
@@ -692,7 +659,9 @@ contains
                 x(2)                               &
                           )
   end function Lerp2D
+!==============================================================================!
 
+!==============================================================================!
   elemental function Lerp3D(FldQty, xi)
     implicit none
     class(FluidQty), intent(in) :: FldQty
@@ -701,7 +670,7 @@ contains
     real(dp)                    :: x(3)
     integer                     :: ix(3)
     real(dp)                    :: VtxVal(8) ! Values at cell vertices. VtxVal(1) = x000, VtxVal(2) = x100, VtxVal(3) = x010, VtxVal(4) = x110, VtxVal(5) = x001, VtxVal(6) = x101, VtxVal(7) = x011, VtxVal(8) = x111
-    integer, parameter          :: ivtc(24) = [0,1,0,1,0,1,0,1,0,0,1,1,0,0,1,1,0,0,0,0,1,1,1,1] + 1 ! Index array of the cell vertex displacements.
+    integer, parameter          :: ivtc(24) = [0,1,0,1,0,1,0,1,0,0,1,1,0,0,1,1,0,0,0,0,1,1,1,1] ! Index array of the cell vertex displacements.
 
     !    x011   ------------- x111
     !          /|          /|
@@ -716,14 +685,14 @@ contains
     ! x000  ------------- x100
 
     ! Clamp coordinates to the boundaries.
-    x = min( max(xi % x - FldQty % ost(1:3), 0._dp), real(FldQty % whd(1:3),dp) )
+    x = min( max(xi % x - FldQty % ost(1:3), 0._dp), real(FldQty % whd(1:3) - 1.001_dp, dp) )
 
     ! Prepare interpolation values.
-    ix = floor( x )
+    ix = aint( x )
     ! We make sure 0 < x < 1
     x  = x - ix
 
-    VtxVal(1:8) = FldQty % ReadVal(ix(1) + ivtc(1:8), ix(2) + ivtc(9:16), ix(3) + ivtc(17:24))
+    VtxVal = FldQty % ReadVal(ix(1) + ivtc(1:8), ix(2) + ivtc(9:16), ix(3) + ivtc(17:24))
 
     Lerp3D = FldQty % Lerp(                            &
                 [                                      &
@@ -751,6 +720,94 @@ contains
                 x(3)                                   &
                           )
   end function Lerp3D
+!==============================================================================!
+
+!==============================================================================!
+  subroutine MaxTimestep2D(FldSlv, t)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    real(dp)       , intent(in)    :: t ! Time
+    real(dp)                       :: MaxVel, RMSVel ! Max and Root-mean-squared (RMS) Velocity * sqrt(n) at the centre of the grid.
+    integer                        :: i, j   ! Counters
+    real(dp)                       :: ci, cj ! Center i, center j
+
+    MaxVel = 0.
+
+    ly: do j = 0, FldSlv % whd(2) - 1
+      ! Half way to the next y-index.
+      cj = j + 0.5
+      lx: do i = 0, FldSlv % whd(1) - 1
+        ! Half way to the next x-index.
+        ci = i + 0.5
+        ! Calculate the Root-mean-squared * sqrt(n). Dividing by sqrt(n) is unecessary because n >= 1.
+        RMSVel =  sum( FldSlv % u % Lerp(Vec2D([ci, cj])) * FldSlv % u % Lerp(Vec2D([ci, cj])) )
+        ! Compare to Maximal Velocity.
+        if (RMSVel < MaxVel) cycle lx
+        ! Update MaxVel
+        MaxVel = RMSVel
+      end do lx
+    end do ly
+
+    ! Fluid should not flow through more than one cell per iteration.
+    FldSlv % TimeStep = FldSlv % safety * FldSlv % celsiz / sqrt(MaxVel)
+
+    ! Clamp Time Step to be within Reasonable Bounds.
+    ctsrb: if (FldSlv % TimeStep < FldSlv % MinTimeStep .or. t + FldSlv % TimeStep == t) then
+      ! Increase Timestep.
+      it: do
+        FldSlv % TimeStep = FldSlv % TimeStep + FldSlv % MinTimeStep
+        if (t + FldSlv % TimeStep > t) return
+      end do it
+    else if (FldSlv % TimeStep > FldSlv % MaxTimeStep) then ctsrb
+      FldSlv % Timestep = (FldSlv % MinTimeStep + FldSlv % MaxTimeStep)/2.
+    end if ctsrb
+  end subroutine MaxTimestep2D
+
+  subroutine MaxTimestep3D(FldSlv, t)
+    implicit none
+    class(FluidSlv), intent(inout) :: FldSlv
+    real(dp)       , intent(in)    :: t ! Time
+    real(dp)                       :: MaxVel, RMSVel ! Max and Root-mean-squared (RMS) Velocity * sqrt(n) at the centre of the grid.
+    integer                        :: i, j, k    ! Counters
+    real(dp)                       :: ci, cj, ck ! Center i, center j, center k
+
+    MaxVel = 0.
+
+    lz: do k = 0, FldSlv % whd(3) - 1
+      ck = k + 0.5
+      ly: do j = 0, FldSlv % whd(2) - 1
+        ! Half way to the next y-index.
+        cj = j + 0.5
+        lx: do i = 0, FldSlv % whd(1) - 1
+          ! Half way to the next x-index.
+          ci = i + 0.5
+          ! Calculate the Root-mean-squared * sqrt(n). Dividing by sqrt(n) is unecessary because n >= 1.
+          RMSVel = sum( FldSlv % u % Lerp(Vec3D([ci, cj, ck])) * FldSlv % u % Lerp(Vec3D([ci, cj, ck])) )
+          ! Compare to Maximal Velocity.
+          cmv: if (RMSVel > MaxVel) then
+            ! Update MaxVel
+            MaxVel = RMSVel
+          else cmv
+            cycle lx
+          end if cmv
+        end do lx
+      end do ly
+    end do lz
+
+    ! Fluid should not flow through more than one cell per iteration.
+    FldSlv % TimeStep = FldSlv % safety * FldSlv % celsiz / sqrt(MaxVel)
+
+    ! Clamp Time Step to be within Reasonable Bounds.
+    ctsrb: if (FldSlv % TimeStep < FldSlv % MinTimeStep .or. t + FldSlv % TimeStep == t) then
+      ! Increase Timestep.
+      it: do
+        FldSlv % TimeStep = FldSlv % TimeStep + FldSlv % MinTimeStep
+        if (t + FldSlv % TimeStep > t) return
+      end do it
+    else if (FldSlv % TimeStep > FldSlv % MaxTimeStep) then ctsrb
+      FldSlv % Timestep = (FldSlv % MinTimeStep + FldSlv % MaxTimeStep)/2.
+    end if ctsrb
+  end subroutine MaxTimestep3D
 
   subroutine FEulerVel2D(FldQty, FldVel, xi, xf, h)
     implicit none
@@ -786,19 +843,21 @@ contains
     type(FluidQty2D), intent(in)    :: FldVel
     real(dp)        , intent(in)    :: h
     real(dp)                        :: x(2)
-    integer                         :: i, j
+    integer                         :: i, j, idx
 
     ! Loop through y.
-    ly: do j = 1, FldQty % whd(2) - 1
-      ! Set value of y.
-      x(2) = j + FldQty % ost(2)
+    idx = 0
+    ly: do j = 0, FldQty % whd(2) - 1
       ! Loop through x.
-      lx: do i = 1, FldQty % whd(1) - 1
+      lx: do i = 0, FldQty % whd(1) - 1
         x(1) = i + FldQty % ost(1)
+        x(2) = j + FldQty % ost(2)
         ! Integrate FldQty.
         call FldQty % FEuler(FldVel % FldQty(:), Vec2D(x), x, h)
         ! Interpolate component from grid and write new value.
-        call FldQty % WriteNewVal(i, j, FldQty % Lerp(Vec2D(x)))
+        FldQty % new(idx) = FldQty % Lerp(Vec2D(x))
+        print*, FldQty % new(idx)
+        idx = idx + 1
       end do lx
     end do ly
   end subroutine Advect2D
@@ -812,16 +871,14 @@ contains
     integer                         :: i, j, k
 
     ! Loop through z.
-    lz: do k = 1, FldQty % whd(3) - 1
-      ! Set value of z.
-      x(3) = k + FldQty % ost(3)
+    lz: do k = 0, FldQty % whd(3) - 1
       ! Loop through y.
-      ly: do j = 1, FldQty % whd(2) - 1
-        ! Set value of y.
-        x(2) = j + FldQty % ost(2)
+      ly: do j = 0, FldQty % whd(2) - 1
         ! Loop through x.
-        lx: do i = 1, FldQty % whd(1) - 1
+        lx: do i = 0, FldQty % whd(1) - 1
           x(1) = i + FldQty % ost(1)
+          x(2) = j + FldQty % ost(2)
+          x(3) = k + FldQty % ost(3)
           ! Integrate FldQty.
           call FldQty % FEuler(FldVel % FldQty(:), Vec3D(x), x, h)
           ! Interpolate component from grid and save the new value.
@@ -835,16 +892,21 @@ contains
     implicit none
     class(FluidSlv), intent(inout) :: FldSlv
     real(dp)                       :: scale, sxp ! Scale, scale x pressure.
-    integer                        :: i, j, ip1, jp1, idx
+    integer                        :: i, j, ip1, jp1, idx, idxxp1, idxyp1
 
     scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz)
+    !print*, scale
 
     ! Applies pressure and updates the velocity field.
-    idx = 1
-    ly: do j = 1, FldSlv % whd(2) - 1
-      ip1 = i + 1
-      lx: do i = 1, FldSlv % whd(1) - 1
-        jp1 = j + 1
+    idx = 0
+    ly: do j = 0, FldSlv % whd(2) - 1
+      jp1 = j + 1
+      idxxp1 = FldSlv % whd(1) * j
+      idxyp1 = FldSlv % whd(1) * jp1
+      lx: do i = 0, FldSlv % whd(1) - 1
+        ip1 = i + 1
+        idxxp1 = ip1 + idxxp1
+        idxyp1 = i   + idxyp1
         sxp = scale * FldSlv % p(idx)
         call FldSlv % u % WriteOldVal(i, j, FldSlv % u % ReadVal(i, j) - sxp)
         call FldSlv % u(1) % WriteOldVal(ip1, j  , FldSlv % u(1) % ReadVal(ip1, j  ) + sxp)
@@ -852,7 +914,6 @@ contains
         idx = idx + 1
       end do lx
     end do ly
-
     ! Set boundary velocities to zero (conservation of mass, nothing comes in or goes out).
 
     !                               at ix \in [1, width] and iy = height
@@ -878,17 +939,21 @@ contains
     !                                              Vy = 0
 
     ! Vertical boundaries.
-    vb: do j = 1, FldSlv % whd(2) - 1
+    !dir$ parallel
+    !dir$ loop count min(128)
+    vb: do j = 0, FldSlv % whd(2) - 1
       ! Lower x boundary.
-      call FldSlv % u(1) % WriteOldVal(1, j, 0._dp)
+      call FldSlv % u(1) % WriteOldVal(0, j, 0._dp)
       ! Upper x boundary
       call FldSlv % u(1) % WriteOldVal(FldSlv % whd(1), j, 0._dp)
     end do vb
 
     ! Horizontal boundaries.
-    hb: do i = 1, FldSlv % whd(1) - 1
+    !dir$ parallel
+    !dir$ loop count min(128)
+    hb: do i = 0, FldSlv % whd(1) - 1
       ! Lower y boundary.
-      call FldSlv % u(2) % WriteOldVal(i, 1, 0._dp)
+      call FldSlv % u(2) % WriteOldVal(i, 0, 0._dp)
       ! Upper y boundary
       call FldSlv % u(2) % WriteOldVal(i, FldSlv % whd(2), 0._dp)
     end do hb
@@ -904,12 +969,12 @@ contains
     scale = FldSlv % TimeStep / (FldSlv % srho * FldSlv % celsiz)
 
     ! Applies pressure and updates the velocity field.
-    idx = 1
-    lz: do k = 1, FldSlv % whd(3) - 1
+    idx = 0
+    lz: do k = 0, FldSlv % whd(3) - 1
       kp1 = k + 1
-      ly: do j = 1, FldSlv % whd(2) - 1
+      ly: do j = 0, FldSlv % whd(2) - 1
         jp1 = j + 1
-        lx: do i = 1, FldSlv % whd(1) - 1
+        lx: do i = 0, FldSlv % whd(1) - 1
           ip1 = i + 1
           sxp = scale * FldSlv % p(idx)
           ! Update velocity field.init
@@ -979,10 +1044,14 @@ contains
     ! Back Plane: At iy = height, z \in [1, depth] and x \in [1, widht], Vy = 0
 
     ! XY Plane Boundaries
-    ! Loop through y.
-    ly2: do j = 1, FldSlv % whd(2) - 1
+    ! Loop through y
+    !dir$ parallel
+    !dir$ loop count min(64)
+    ly2: do j = 0, FldSlv % whd(2) - 1
       ! Loop through x.
-      lx2: do i = 1, FldSlv % whd(1) - 1
+      !dir$ parallel
+      !dir$ loop count min(64)
+      lx2: do i = 0, FldSlv % whd(1) - 1
         ! Front XY plane (iz = 1)
         call FldSlv % u(3) % WriteOldVal(i, j, 1, 0._dp)
         ! Back XY plane (iz = whd(3))
@@ -992,9 +1061,13 @@ contains
 
     ! YZ Plane Boundaries.
     ! Loop through z.
-    lz2: do k = 1, FldSlv % whd(3) - 1
+    !dir$ parallel
+    !dir$ loop count min(64)
+    lz2: do k = 0, FldSlv % whd(3) - 1
       ! Loop through y.
-      ly3: do j = 1, FldSlv % whd(2) - 1
+      !dir$ parallel
+      !dir$ loop count min(64)
+      ly3: do j = 0, FldSlv % whd(2) - 1
         ! Left YZ plane (ix = 1)
         call FldSlv % u(1) % WriteOldVal(1, j, k, 0._dp)
         ! Right YZ plane (ix = whd(1))
@@ -1004,9 +1077,12 @@ contains
 
     ! XZ Plane Boundaries.
     ! Loop through z.
-    lz3: do k = 1, FldSlv % whd(3) - 1
+    !dir$ parallel
+    !dir$ loop count min(4)
+    lz3: do k = 0, FldSlv % whd(3) - 1
       ! Loop through x.
-      lx3: do i = 1, FldSlv % whd(1) - 1
+      !dir$ ivdep
+      lx3: do i = 0, FldSlv % whd(1) - 1
         ! Bottom XZ plane (iy = 1)
         call FldSlv % u(2) % WriteOldVal(i, 1, k, 0._dp)
         ! Top XZ plane (iy = whd(2))
@@ -1015,15 +1091,53 @@ contains
     end do lz3
   end subroutine ApplyPressure3D
 
+  pure function ReadArray2D(FldSlv, array, i, j)
+    implicit none
+    class(FluidSlv), intent(in) :: FldSlv
+    real(dp),        intent(in) :: array(0:)
+    integer,         intent(in) :: i, j
+    real(dp)                    :: ReadArray2D
+
+    ReadArray2D = array(i + FldSlv % whd(1)*j)
+  end function ReadArray2D
+
+  pure function ReadArray3D(FldSlv, array, i, j, k)
+    implicit none
+    class(FluidSlv), intent(in) :: FldSlv
+    real(dp),        intent(in) :: array(0:)
+    integer,         intent(in) :: i, j, k
+    real(dp)                    :: ReadArray3D
+
+    ReadArray3D = array(i + FldSlv % whd(1)*j + FldSlv % whd(1)*k)
+  end function ReadArray3D
+
+  pure subroutine WriteArray2D(FldSlv, array, i, j, value)
+    implicit none
+    class(FluidSlv), intent(in) :: FldSlv
+    real(dp),        intent(inout) :: array(0:)
+    integer,         intent(in) :: i, j
+    real(dp),        intent(in) :: value
+
+    array(i + FldSlv % whd(1)*j) = value
+  end subroutine WriteArray2D
+
+  pure subroutine WriteArray3D(FldSlv, array, i, j, k, value)
+    implicit none
+    class(FluidSlv), intent(in) :: FldSlv
+    real(dp),        intent(inout) :: array(0:)
+    integer,         intent(in) :: i, j, k
+    real(dp),        intent(in) :: value
+
+    array(i + FldSlv % whd(1)*j + FldSlv % whd(1)*k) = value
+  end subroutine WriteArray3D
+
   elemental function ReadVal2D(FldQty, i, j)
     implicit none
     integer,         intent(in) :: i, j
     class(FluidQty), intent(in) :: FldQty
     real(dp)                    :: ReadVal2D
-    integer                     :: idx
 
-    idx = i + FldQty % whd(1)*(j-1)
-    ReadVal2D = FldQty % old(idx)
+    ReadVal2D = FldQty % old(i + FldQty % whd(1)*j)
   end function ReadVal2D
 
   elemental function ReadVal3D(FldQty, i, j, k)
@@ -1031,10 +1145,8 @@ contains
     integer,         intent(in) :: i, j, k
     class(FluidQty), intent(in) :: FldQty
     real(dp)                    :: ReadVal3D
-    integer                     :: idx
 
-    idx = i + FldQty % whd(1)*(j-1) + FldQty % whd(1) * FldQty % whd(2)*(k-1)
-    ReadVal3D = FldQty % old(idx)
+    ReadVal3D = FldQty % old(i + FldQty % whd(1)*j + FldQty % whd(1) * FldQty % whd(2)*k)
   end function ReadVal3D
 
   elemental subroutine WriteNewVal2D(FldQty, i, j, NewVal)
@@ -1042,10 +1154,8 @@ contains
     integer,         intent(in)    :: i, j
     real(dp),        intent(in)    :: NewVal
     class(FluidQty), intent(inout) :: FldQty
-    integer                        :: idx
 
-    idx = i + FldQty % whd(1)*(j-1)
-    FldQty % new(idx) = NewVal
+    FldQty % new(i + FldQty % whd(1)*j) = NewVal
   end subroutine WriteNewVal2D
 
   elemental subroutine WriteNewVal3D(FldQty, i, j, k, NewVal)
@@ -1053,10 +1163,8 @@ contains
     integer,         intent(in)    :: i, j, k
     real(dp),        intent(in)    :: NewVal
     class(FluidQty), intent(inout) :: FldQty
-    integer                        :: idx
 
-    idx = i + FldQty % whd(1)*(j-1) + FldQty % whd(1) * FldQty % whd(2)*(k-1)
-    FldQty % new(idx) = NewVal
+    FldQty % new(i + FldQty % whd(1)*j + FldQty % whd(1) * FldQty % whd(2)*k) = NewVal
   end subroutine WriteNewVal3D
 
   elemental subroutine WriteOldVal2D(FldQty, i, j, NewVal)
@@ -1064,10 +1172,8 @@ contains
     integer,         intent(in)    :: i, j
     real(dp),        intent(in)    :: NewVal
     class(FluidQty), intent(inout) :: FldQty
-    integer                        :: idx
 
-    idx = i + FldQty % whd(1)*(j-1)
-    FldQty % old(idx) = NewVal
+    FldQty % old(i + FldQty % whd(1)*j) = NewVal
   end subroutine WriteOldVal2D
 
   elemental subroutine WriteOldVal3D(FldQty, i, j, k, NewVal)
@@ -1075,16 +1181,16 @@ contains
     integer,         intent(in)    :: i, j, k
     real(dp),        intent(in)    :: NewVal
     class(FluidQty), intent(inout) :: FldQty
-    integer                        :: idx
 
-    idx = i + FldQty % whd(1)*(j-1) + FldQty % whd(1) * FldQty % whd(2)*(k-1)
-    FldQty % old(idx) = NewVal
+    FldQty % old(i + FldQty % whd(1)*j + FldQty % whd(1) * FldQty % whd(2)*k) = NewVal
   end subroutine WriteOldVal3D
 
   elemental subroutine UpdateVals(FldQty)
     implicit none
     class(FluidQty), intent(inout) :: FldQty
+    !dir$ loop count min(256)
     FldQty % old = FldQty % new
+    !dir$ loop count min(512)
     FldQty % new = 0.
   end subroutine UpdateVals
 
