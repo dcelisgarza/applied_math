@@ -133,14 +133,14 @@ program test_fluid
           new_line(" "), " Expected FldSlv2D % rho % celsiz = ", scale/minval(whd2D), new_line(new_line(" "))
 
   xi2D % x = [0._dp, 1._dp, 0._dp, 1._dp]
-  initial_cond = [2.0_dp, 3.0_dp, 1._dp]
+  initial_cond = [1.0_dp, 2.0_dp, 3.0_dp]
 
   CALL SYSTEM_CLOCK(startcount, countrate)
-  do i = 1, 10000000
-    call FldSlv2D % InitFlow(xi2D, initial_cond)
+  do i = 1, 1
+    call FldSlv2D % AddFlow(xi2D, initial_cond)
   end do
   CALL SYSTEM_CLOCK(endcount, countrate)
-  print*, "InitFlow: It took me", endcount - startcount, "clicks (", (endcount - startcount)/countrate*1000," ms)"
+  print*, "ADDFLOW: It took me", endcount - startcount, "clicks (", (endcount - startcount)/countrate*1000," ms)"
 
   print*, new_line(new_line(" ")), "FldSlv2D % rho % old = ", new_line(" "), FldSlv2D % rho % old
 
@@ -150,7 +150,7 @@ program test_fluid
 
   t = 0._dp
   CALL SYSTEM_CLOCK(startcount, countrate)
-  do i = 1, 10000000
+  do i = 1, 1
     call FldSlv2D % MaxTimeStep2D(t)
   end do
   CALL SYSTEM_CLOCK(endcount, countrate)
@@ -159,7 +159,7 @@ program test_fluid
 
 
   CALL SYSTEM_CLOCK(startcount, countrate)
-  do i = 1, 10000000
+  do i = 1, 1
     call FldSlv2D % BuildRhs2D()
   end do
   CALL SYSTEM_CLOCK(endcount, countrate)
@@ -167,7 +167,7 @@ program test_fluid
   print*, new_line(new_line(" ")), " FldSlv2D % prhs = ", FldSlv2D % prhs
 
   CALL SYSTEM_CLOCK(startcount, countrate)
-  call FldSlv2D % GSPSlv2D(10000000, 1d-5)
+  call FldSlv2D % GSPSlv2D(60, 1d-5)
   CALL SYSTEM_CLOCK(endcount, countrate)
   !print*, endvalues - startvalues
   print*, "Gauss-Seidel: It took me", endcount - startcount, "clicks (", (endcount - startcount)/countrate*1000," ms)"
@@ -183,14 +183,8 @@ program test_fluid
   call FldSlv2D % rho % Advect2D(FluidQty2D([FldSlv2D % u]), FldSlv2D%timestep(1))
   call FldSlv2D % u(1) % Advect2D(FluidQty2D([FldSlv2D % u]), FldSlv2D%timestep(1))
   call FldSlv2D % u(2) % Advect2D(FluidQty2D([FldSlv2D % u]), FldSlv2D%timestep(1))
-  do i = 0, 8
-    print"(F12.10)", FldSlv2D % rho % new(i)
-  end do
-  do i = 0, 11
-    print"(F12.10)", FldSlv2D % u(1) % new(i)
-  end do
-  do i = 0, 11
-    print"(F12.10)", FldSlv2D % u(2) % new(i)
-  end do
+  !do i = 0, 8
+  !  print*, FldSlv2D % rho % new(i)
+  !end do
 
 end program test_fluid
