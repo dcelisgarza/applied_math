@@ -33,10 +33,10 @@ program test_fluid
   safety = 1._dp
   ! Grid scale.
   scale = 1._dp
-  ! 3x3 2D grid with sides of length 3 (each box is of size 1x1).
-  whd2D = 3
+  ! 10x10 2D grid with sides of length 3 (each box is of size 1x1).
+  whd2D = 10
   ! Density.
-  rho = 0.1_dp
+  rho = 1._dp
   ! Initial timestep.
   timestep = 0.005
   ! Names
@@ -132,11 +132,11 @@ program test_fluid
   print*, " FldSlv2D % rho % celsiz = ", FldSlv2D % rho % celsiz, &
           new_line(" "), " Expected FldSlv2D % rho % celsiz = ", scale/minval(whd2D), new_line(new_line(" "))
 
-  xi2D % x = [0._dp, 1._dp, 0._dp, 1._dp]
-  initial_cond = [2.0_dp, 3.0_dp, 1._dp]
+  xi2D % x = [0.2_dp, 0.5_dp, 0.2_dp, 0.5_dp]
+  initial_cond = [5.0_dp, 1.0_dp, 0.3_dp]
 
   CALL SYSTEM_CLOCK(startcount, countrate)
-  do i = 1, 10000000
+  do i = 1, 1
     call FldSlv2D % InitFlow(xi2D, initial_cond)
   end do
   CALL SYSTEM_CLOCK(endcount, countrate)
@@ -148,28 +148,26 @@ program test_fluid
 
   print*, new_line(new_line(" ")), "FldSlv2D % u(2) % old = ", new_line(" "), FldSlv2D % u(2) % old, new_line(new_line(" "))
 
-  t = 0._dp
+    t = 0._dp
   CALL SYSTEM_CLOCK(startcount, countrate)
-  do i = 1, 10000000
+  do i = 1, 1
     call FldSlv2D % MaxTimeStep2D(t)
   end do
   CALL SYSTEM_CLOCK(endcount, countrate)
   print*, "MAXTIMESTEP: It took me", endcount - startcount, "clicks (", (endcount - startcount)/countrate*1000," ms)"
-  print*, new_line(new_line(" ")), FldSlv2D % TimeStep
-
+  print*, new_line(new_line(" ")), FldSlv2D % TimeStep, new_line(new_line(" "))
 
   CALL SYSTEM_CLOCK(startcount, countrate)
-  do i = 1, 10000000
+  do i = 1, 1
     call FldSlv2D % BuildRhs2D()
   end do
   CALL SYSTEM_CLOCK(endcount, countrate)
   print*, "BUILDRHS: It took me", endcount - startcount, "clicks (", (endcount - startcount)/countrate*1000," ms)"
-  print*, new_line(new_line(" ")), " FldSlv2D % prhs = ", FldSlv2D % prhs
+  print*, new_line(new_line(" ")), " FldSlv2D % prhs = ", FldSlv2D % prhs, new_line(new_line(" "))
 
   CALL SYSTEM_CLOCK(startcount, countrate)
-  call FldSlv2D % GSPSlv2D(10000000, 1d-5)
+  call FldSlv2D % GSPSlv2D(600, 1d-5)
   CALL SYSTEM_CLOCK(endcount, countrate)
-  !print*, endvalues - startvalues
   print*, "Gauss-Seidel: It took me", endcount - startcount, "clicks (", (endcount - startcount)/countrate*1000," ms)"
 
   call FldSlv2D % ApplyPressure2D()
@@ -183,14 +181,33 @@ program test_fluid
   call FldSlv2D % rho % Advect2D(FluidQty2D([FldSlv2D % u]), FldSlv2D%timestep(1))
   call FldSlv2D % u(1) % Advect2D(FluidQty2D([FldSlv2D % u]), FldSlv2D%timestep(1))
   call FldSlv2D % u(2) % Advect2D(FluidQty2D([FldSlv2D % u]), FldSlv2D%timestep(1))
-  do i = 0, 8
-    print"(F12.10)", FldSlv2D % rho % new(i)
+  print*, "Rho", new_line(new_line(" "))
+  do i = 0, 100
+    print"(I8,A,I8,A,I8,A,I3,F14.10)", loc(FldSlv2D % rho % old(i)) -        &
+                                    loc(FldSlv2D % rho % new(i)), "     ",&
+                                    loc(FldSlv2D % rho % old(i)), "     ",&
+                                    loc(FldSlv2D % rho % new(i)), "     ",&
+                                    i, FldSlv2D % rho % new(i)
   end do
-  do i = 0, 11
-    print"(F12.10)", FldSlv2D % u(1) % new(i)
+
+  print*, "Ux", new_line(new_line(" "))
+  do i = 0, 110
+    print"(I8,A,I8,A,I8,A,I3,F14.10)", loc(FldSlv2D % u(1) % old(i)) -        &
+                                    loc(FldSlv2D % u(1) % new(i)), "     ",&
+                                    loc(FldSlv2D % u(1) % old(i)), "     ",&
+                                    loc(FldSlv2D % u(1) % new(i)), "     ",&
+                                    i, FldSlv2D % u(1) % new(i)
   end do
-  do i = 0, 11
-    print"(F12.10)", FldSlv2D % u(2) % new(i)
+
+  print*, "Uy", new_line(new_line(" "))
+  do i = 0, 110
+    print"(I8,A,I8,A,I8,A,I3,F14.10)", loc(FldSlv2D % u(2) % old(i)) -        &
+                                    loc(FldSlv2D % u(2) % new(i)), "     ",&
+                                    loc(FldSlv2D % u(2) % old(i)), "     ",&
+                                    loc(FldSlv2D % u(2) % new(i)), "     ",&
+                                    i, FldSlv2D % u(2) % new(i)
   end do
+
+
 
 end program test_fluid
