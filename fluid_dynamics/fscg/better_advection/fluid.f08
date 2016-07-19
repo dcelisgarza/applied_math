@@ -37,9 +37,9 @@ module fluid
     generic   :: Lerp => Lerp1D, Lerp2D, Lerp3D
     ! Cubic interpolate.
     procedure :: Cerp1D
-    procedure :: Cerp2D
+    procedure :: SlowCerp2D
     procedure :: BcC2D
-    procedure :: QuickCerp2D
+    procedure :: Cerp2D
     generic   :: Cerp => Cerp1D, Cerp2D
     ! Integrate.
     procedure :: FEulerVel2D
@@ -656,15 +656,14 @@ contains
 !==============================================================================!
 
 !==============================================================================!
-  impure elemental function Cerp2D(FldQty, xi)
+  impure elemental function Lerp2D(FldQty, xi)
     implicit none
     class(FluidQty), intent(in) :: FldQty
     real(dp)                    :: VtxVal(4) ! VALues at cell VERtices. VtxVal(1) = x00, VtxVal(2) = x10, VtxVal(3) = x01, VtxVal(4) = x11
     type(Vec2D)    , intent(in) :: xi ! xi%x(1) = x, xi%x(2) = y
-    real(dp)                    :: x(2)
-    real(dp)                    :: Cerp2D
-    integer                     :: xn(8)
-    integer                     :: Auxidx(4)
+    real(dp)                    :: x(2), OneMinusX(2)
+    real(dp)                    :: Lerp2D
+    integer, parameter          :: ivtc(8) = [0,1,0,1,0,0,1,1] ! Index array of the cell vertex displacements.
     integer                     :: ix(2), i
 
     ! x01   -----------   x11
@@ -672,6 +671,40 @@ contains
     !       |         |
     !       |         |
     ! x00   -----------   x10
+
+    ! Clamp coordinates to the boundaries.
+    x = min( max(xi % x - FldQty % ost(1:2), 0._dp), real(FldQty % whd - 1.001_dp, dp) )
+
+    ! Prepare interpolation values.
+    ix = aint( x )
+
+    ! We make sure 0 < x < 1
+    x  = x - ix
+
+    ! Values at vertices.
+    do i = 1, 4
+      VtxVal(i) = FldQty % old(ix(1) + ivtc(i) + FldQty % whd(1)*(ix(2) + ivtc(i+4)))
+    end do
+
+    OneMinusX = 1._dp-x
+    Lerp2D = VtxVal(1)*(OneMinusX(1))*(OneMinusX(2)) + &
+             VtxVal(2)*x(1)*(OneMinusX(2))           + &
+             VtxVal(3)*x(2)*(OneMinusX(1))           + &
+             VtxVal(4)*product(x)
+  end function Lerp2D
+!==============================================================================!
+
+!==============================================================================!
+  impure elemental function SlowCerp2D(FldQty, xi)
+    implicit none
+    class(FluidQty), intent(in) :: FldQty
+    real(dp)                    :: VtxVal(4) ! VALues at cell VERtices. VtxVal(1) = x00, VtxVal(2) = x10, VtxVal(3) = x01, VtxVal(4) = x11
+    type(Vec2D)    , intent(in) :: xi ! xi%x(1) = x, xi%x(2) = y
+    real(dp)                    :: x(2)
+    real(dp)                    :: SlowCerp2D
+    integer                     :: xn(8)
+    integer                     :: Auxidx(4)
+    integer                     :: ix(2), i
 
     ! Clamp coordinates to the boundaries.
     x = min( max(xi % x - FldQty % ost(1:2), 0._dp), real(FldQty % whd - 1.001_dp, dp) )
@@ -693,7 +726,6 @@ contains
     Auxidx(4) = FldQty % whd(1) * xn(8)
 
     ! Values at vertices.
-    ! VtxVal(1) = x00, VtxVal(2) = x10, VtxVal(3) = x01, VtxVal(4) = x11
     VtxVal(1) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(1)), FldQty % old(xn(3) + Auxidx(1)),&
                                FldQty % old(xn(5) + Auxidx(1)), FldQty % old(xn(7) + Auxidx(1))], x(1))
 
@@ -706,8 +738,204 @@ contains
     VtxVal(4) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(4)), FldQty % old(xn(3) + Auxidx(4)),&
                                FldQty % old(xn(5) + Auxidx(4)), FldQty % old(xn(7) + Auxidx(4))], x(1))
 
-    Cerp2D = FldQty % Cerp(VtxVal, x(2))
-  end function Cerp2D
+    SlowCerp2D = FldQty % Cerp(VtxVal, x(2))
+  end function SlowCerp2D
+!==============================================================================!
+
+!==============================================================================!
+  impure elemental function Lerp3D(FldQty, xi)
+    implicit none
+    class(FluidQty), intent(in) :: FldQty
+    real(dp)                    :: VtxVal(8) ! Values at cell vertices. VtxVal(1) = x000, VtxVal(2) = x100, VtxVal(3) = x010, VtxVal(4) = x110, VtxVal(5) = x001, VtxVal(6) = x101, VtxVal(7) = x011, VtxVal(8) = x111
+    type(Vec3D),     intent(in) :: xi! xi%x(1) = x, xi%x(2) = y, xi%x(3) = z
+    real(dp)                    :: x(3), OneMinusX(3)
+    real(dp)                    :: Lerp3D
+    integer, parameter          :: ivtc(24) = [0,1,0,1,0,1,0,1,0,0,1,1,0,0,1,1,0,0,0,0,1,1,1,1] ! Index array of the cell vertex displacements.
+    integer                     :: ix(3), i
+
+    !    x011   ------------- x111
+    !          /|          /|
+    !         / |         / |
+    !        /  |        /  |
+    ! x010  -------------   | x110
+    !       |   |       |   |
+    !  x001 |   --------|--- x101
+    !       |  /        |  /
+    !       | /         | /
+    !       |/          |/
+    ! x000  ------------- x100
+
+    ! Clamp coordinates to the boundaries.
+    x = min( max(xi % x - FldQty % ost(1:3), 0._dp), real(FldQty % whd - 1.001_dp, dp) )
+
+    ! Prepare interpolation values.
+    ix = aint( x )
+    ! We make sure 0 < x < 1
+    x  = x - ix
+
+    ! Values at vertices.
+    do i = 1, 8
+      VtxVal(i) = FldQty % old(ix(1)+ivtc(i)+FldQty%whd(1)*(ix(2)+ivtc(i+8))+FldQty%whd(1)*FldQty%whd(2)*(ix(3)+ivtc(i+16)))
+    end do
+
+    OneMinusX = 1._dp-x
+    Lerp3D = VtxVal(1)*product(OneMinusX)             + &
+             VtxVal(2)*x(1)*product(OneMinusX(2:3))   + &
+             VtxVal(3)*x(2)*product(OneMinusX(1:3:2)) + &
+             VtxVal(4)*product(x(1:2))*OneMinusX(3)   + &
+             VtxVal(5)*x(3)*product(OneMinusX(1:2))   + &
+             VtxVal(6)*product(x(1:3:2))*OneMinusX(2) + &
+             VtxVal(7)*product(x(2:3))*OneMinusX(1)   + &
+             VtxVal(8)*product(x)
+
+    !Lerp3D = FldQty % Lerp(                            &
+    !            [                                      &
+    !              ! Front face x000, x100, x010, x110
+    !              FldQty % Lerp(                       &
+    !                [                                  &
+    !                  ! Lower edge: x000, x100.
+    !                  FldQty % Lerp(VtxVal(1:2),x(1)), &
+    !                  ! Upper edge: x010, x110.
+    !                  FldQty % Lerp(VtxVal(3:4),x(1))  &
+    !                ]                                , &
+    !                x(2)                               &
+    !                           ),                      &
+    !              ! Back face x001, x101, x011, x111
+    !              FldQty % Lerp(                       &
+    !                [                                  &
+    !                  ! Lower edge: x001, x101.
+    !                  FldQty % Lerp(VtxVal(5:6),x(1)), &
+    !                  ! Upper edge: x011, x111.
+    !                  FldQty % Lerp(VtxVal(7:8),x(1))  &
+    !                ]                                , &
+    !                x(2)                               &
+    !                          )                        &
+    !            ],                                     &
+    !            x(3)                                   &
+    !                      )
+  end function Lerp3D
+!==============================================================================!
+
+!==============================================================================!
+  impure elemental function SlowCerp3D(FldQty, xi)
+    implicit none
+    class(FluidQty), intent(in) :: FldQty
+    real(dp)                    :: VtxVal(16) ! Values at cell vertices. VtxVal(1) = x000, VtxVal(2) = x100, VtxVal(3) = x010, VtxVal(4) = x110, VtxVal(5) = x001, VtxVal(6) = x101, VtxVal(7) = x011, VtxVal(8) = x111
+    type(Vec3D)    , intent(in) :: xi ! xi%x(1) = x, xi%x(2) = y, xi%x(3) = z
+    real(dp)                    :: TmpCerp(4)
+    real(dp)                    :: x(3)
+    real(dp)                    :: SlowCerp3D
+    integer                     :: xn(12)
+    integer                     :: Auxidx(16)
+    integer                     :: ix(3)
+
+    ! Clamp coordinates to the boundaries.
+    x = min( max(xi % x - FldQty % ost(1:3), 0._dp), real(FldQty % whd - 1.001_dp, dp) )
+
+    ! Prepare interpolation values.
+    ix = aint( x )
+
+    ! We make sure 0 < x < 1
+    x  = x - ix
+
+    xn(1:3) = max(ix - 1, 0)
+    xn(4:6) = ix
+    xn(7:9) = ix + 1
+    xn(10:12) = min(ix + 2, FldQty % whd - 1)
+    ! Calculating y-displacement.
+    Auxidx(1)  = FldQty % whd(1) * (xn(2)  + FldQty % whd(2) * xn(3) )
+    Auxidx(2)  = FldQty % whd(1) * (xn(5)  + FldQty % whd(2) * xn(3) )
+    Auxidx(3)  = FldQty % whd(1) * (xn(8)  + FldQty % whd(2) * xn(3) )
+    Auxidx(4)  = FldQty % whd(1) * (xn(11) + FldQty % whd(2) * xn(3) )
+    Auxidx(5)  = FldQty % whd(1) * (xn(2)  + FldQty % whd(2) * xn(6) )
+    Auxidx(6)  = FldQty % whd(1) * (xn(5)  + FldQty % whd(2) * xn(6) )
+    Auxidx(7)  = FldQty % whd(1) * (xn(8)  + FldQty % whd(2) * xn(6) )
+    Auxidx(8)  = FldQty % whd(1) * (xn(11) + FldQty % whd(2) * xn(6) )
+    Auxidx(9)  = FldQty % whd(1) * (xn(2)  + FldQty % whd(2) * xn(9) )
+    Auxidx(10) = FldQty % whd(1) * (xn(5)  + FldQty % whd(2) * xn(9) )
+    Auxidx(11) = FldQty % whd(1) * (xn(8)  + FldQty % whd(2) * xn(9) )
+    Auxidx(12) = FldQty % whd(1) * (xn(11) + FldQty % whd(2) * xn(9) )
+    Auxidx(13) = FldQty % whd(1) * (xn(2)  + FldQty % whd(2) * xn(12))
+    Auxidx(14) = FldQty % whd(1) * (xn(5)  + FldQty % whd(2) * xn(12))
+    Auxidx(15) = FldQty % whd(1) * (xn(8)  + FldQty % whd(2) * xn(12))
+    Auxidx(16) = FldQty % whd(1) * (xn(11) + FldQty % whd(2) * xn(12))
+
+
+    !    x011   ------------- x111
+    !          /|          /|
+    !         / |         / |
+    !        /  |        /  |
+    ! x010  -------------   | x110
+    !       |   |       |   |
+    !  x001 |   --------|--- x101
+    !       |  /        |  /
+    !       | /         | /
+    !       |/          |/
+    ! x000  ------------- x100
+
+    ! Front face
+    ! x_{n-1} -> x_{n+2}, y_{n-1}, z_{n-1}
+    VtxVal(1) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(1)), FldQty % old(xn(4)  + Auxidx(1)),&
+                               FldQty % old(xn(7) + Auxidx(1)), FldQty % old(xn(10) + Auxidx(1))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n}, z_{n-1}
+    VtxVal(2) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(2)), FldQty % old(xn(4)  + Auxidx(2)),&
+                               FldQty % old(xn(7) + Auxidx(2)), FldQty % old(xn(10) + Auxidx(2))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+1}, z_{n-1}
+    VtxVal(3) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(3)), FldQty % old(xn(4)  + Auxidx(3)),&
+                               FldQty % old(xn(7) + Auxidx(3)), FldQty % old(xn(10) + Auxidx(3))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+2}, z_{n-1}
+    VtxVal(4) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(4)), FldQty % old(xn(4)  + Auxidx(4)),&
+                               FldQty % old(xn(7) + Auxidx(4)), FldQty % old(xn(10) + Auxidx(4))], x(1))
+
+    ! x_{n-1} -> x_{n+2}, y_{n-1}, z_{n}
+    VtxVal(5) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(5)), FldQty % old(xn(4)  + Auxidx(5)),&
+                               FldQty % old(xn(7) + Auxidx(5)), FldQty % old(xn(10) + Auxidx(5))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n}, z_{n}
+    VtxVal(6) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(6)), FldQty % old(xn(4)  + Auxidx(6)),&
+                               FldQty % old(xn(7) + Auxidx(6)), FldQty % old(xn(10) + Auxidx(6))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+1}, z_{n}
+    VtxVal(7) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(7)), FldQty % old(xn(4)  + Auxidx(7)),&
+                               FldQty % old(xn(7) + Auxidx(7)), FldQty % old(xn(10) + Auxidx(7))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+2}, z_{n}
+    VtxVal(8) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(8)), FldQty % old(xn(4)  + Auxidx(8)),&
+                               FldQty % old(xn(7) + Auxidx(8)), FldQty % old(xn(10) + Auxidx(8))], x(1))
+
+    ! Back face
+    ! x_{n-1} -> x_{n+2}, y_{n-1}, z_{n+1}
+    VtxVal(9) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(9)), FldQty % old(xn(4)  + Auxidx(9)),&
+                               FldQty % old(xn(7) + Auxidx(9)), FldQty % old(xn(10) + Auxidx(9))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n}, z_{n+1}
+    VtxVal(10) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(10)), FldQty % old(xn(4)  + Auxidx(10)),&
+                               FldQty % old(xn(7) + Auxidx(10)), FldQty % old(xn(10) + Auxidx(10))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+1}, z_{n+1}
+    VtxVal(11) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(11)), FldQty % old(xn(4)  + Auxidx(11)),&
+                                FldQty % old(xn(7) + Auxidx(11)), FldQty % old(xn(10) + Auxidx(11))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+2}, z_{n+1}
+    VtxVal(12) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(12)), FldQty % old(xn(4)  + Auxidx(12)),&
+                                FldQty % old(xn(7) + Auxidx(12)), FldQty % old(xn(10) + Auxidx(12))], x(1))
+
+    ! x_{n-1} -> x_{n+2}, y_{n-1}, z_{n+2}
+    VtxVal(13) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(13)), FldQty % old(xn(4)  + Auxidx(13)),&
+                                FldQty % old(xn(7) + Auxidx(13)), FldQty % old(xn(10) + Auxidx(13))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n}, z_{n+2}
+    VtxVal(14) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(14)), FldQty % old(xn(4)  + Auxidx(14)),&
+                                FldQty % old(xn(7) + Auxidx(14)), FldQty % old(xn(10) + Auxidx(14))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+1}, z_{n+2}
+    VtxVal(15) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(15)), FldQty % old(xn(4)  + Auxidx(15)),&
+                                FldQty % old(xn(7) + Auxidx(15)), FldQty % old(xn(10) + Auxidx(15))], x(1))
+    ! x_{n-1} -> x_{n+2}, y_{n+2}, z_{n+2}
+    VtxVal(16) = FldQty % Cerp([FldQty % old(xn(1) + Auxidx(16)), FldQty % old(xn(4)  + Auxidx(16)),&
+                                FldQty % old(xn(7) + Auxidx(16)), FldQty % old(xn(10) + Auxidx(16))], x(1))
+
+    ! Interpolate in y
+    TmpCerp(1) = FldQty % Cerp(VtxVal(1:4), x(2))
+    TmpCerp(2) = FldQty % Cerp(VtxVal(5:8), x(2))
+    TmpCerp(3) = FldQty % Cerp(VtxVal(9:12), x(2))
+    TmpCerp(4) = FldQty % Cerp(VtxVal(13:16), x(2))
+
+    ! Interpolate in z
+    SlowCerp3D = FldQty % Cerp(TmpCerp, x(3))
+  end function SlowCerp3D
 !==============================================================================!
 
   function BcC2D(FldQty,xi)
@@ -741,21 +969,25 @@ contains
     Auxidx(4) = FldQty % whd(1) * xn(8)
 
 
-    ! p00, p10, p20, p30
-!    FldQty % old(xn(1) + Auxidx(1)), FldQty % old(xn(3) + Auxidx(1)),&
-!    FldQty % old(xn(5) + Auxidx(1)), FldQty % old(xn(7) + Auxidx(1))
+    ! p00, p10
+    ! FldQty % old(xn(1) + Auxidx(1)), FldQty % old(xn(3) + Auxidx(1))
+    ! p20, p30
+    ! FldQty % old(xn(5) + Auxidx(1)), FldQty % old(xn(7) + Auxidx(1))
 
-    ! p01, p11, p21, p31
-!    FldQty % old(xn(1) + Auxidx(2)), FldQty % old(xn(3) + Auxidx(2)),&
-!    FldQty % old(xn(5) + Auxidx(2)), FldQty % old(xn(7) + Auxidx(2))
+    ! p01, p11
+    ! FldQty % old(xn(1) + Auxidx(2)), FldQty % old(xn(3) + Auxidx(2))
+    ! p21, p31
+    ! FldQty % old(xn(5) + Auxidx(2)), FldQty % old(xn(7) + Auxidx(2))
 
-    ! p02, p12, p22, p32
-!    FldQty % old(xn(1) + Auxidx(3)), FldQty % old(xn(3) + Auxidx(3)),&
-!    FldQty % old(xn(5) + Auxidx(3)), FldQty % old(xn(7) + Auxidx(3))
+    ! p02, p12
+    ! FldQty % old(xn(1) + Auxidx(3)), FldQty % old(xn(3) + Auxidx(3))
+    ! p22, p32
+    ! FldQty % old(xn(5) + Auxidx(3)), FldQty % old(xn(7) + Auxidx(3))
 
-    ! p03, p13, p23, p33
-!    FldQty % old(xn(1) + Auxidx(4)), FldQty % old(xn(3) + Auxidx(4)),&
-!    FldQty % old(xn(5) + Auxidx(4)), FldQty % old(xn(7) + Auxidx(4))
+    ! p03, p13
+    ! FldQty % old(xn(1) + Auxidx(4)), FldQty % old(xn(3) + Auxidx(4))
+    ! p23, p33
+    ! FldQty % old(xn(5) + Auxidx(4)), FldQty % old(xn(7) + Auxidx(4))
 
     VtxVal(0) = FldQty % old(xn(1) + Auxidx(1)) ! p00
     VtxVal(1) = FldQty % old(xn(3) + Auxidx(1)) ! p10
@@ -809,138 +1041,25 @@ contains
 		BcC2D(16) = .25*VtxVal(0) - .75*VtxVal(4) + .75*VtxVal(8) - .25*VtxVal(12) &
     - .75*VtxVal(1) + 2.25*VtxVal(5) - 2.25*VtxVal(9) + .75*VtxVal(13) + .75*VtxVal(2) &
     - 2.25*VtxVal(6) + 2.25*VtxVal(10) - .75*VtxVal(14) - .25*VtxVal(3) + .75*VtxVal(7) - .75*VtxVal(11) + .25*VtxVal(15)
-
   end function BcC2D
 
-  function QuickCerp2D(FldQty, xi, BcC2D)
+  function Cerp2D(FldQty, xi, BcC2D)
     implicit none
     class(FluidQty), intent(in) :: FldQty
     real(dp), intent(in)        :: BcC2D(16)
     type(Vec2D), intent(in)     :: xi
     real(dp)                    :: powX(4) ! powX(1) = x**2, powX(2) = x**3, powX(3) = y**2, powX(4) = y**3
-    real(dp)                    :: QuickCerp2D
+    real(dp)                    :: Cerp2D
 
     ! Calculate x**2, y**2, x**3, y**3
     powX(1:3:2) = xi % x ** 2
     powX(2:4:2) = powX(1:3:2) * xi % x
 
-    QuickCerp2D =  BcC2D(1)  + BcC2D(2)  * xi%x(2) + sum(BcC2D(3:4)   * powX(3:4))            + &
-                  (BcC2D(5)  + BcC2D(6)  * xi%x(2) + sum(BcC2D(7:8)   * powX(3:4))) * xi%x(1) + &
-                  (BcC2D(9)  + BcC2D(10) * xi%x(2) + sum(BcC2D(11:12) * powX(3:4))) * powX(1) + &
-                  (BcC2D(13) + BcC2D(14) * xi%x(2) + sum(BcC2D(15:16) * powX(3:4))) * powX(2)
-  end function QuickCerp2D
-!==============================================================================!
-  impure elemental function Lerp2D(FldQty, xi)
-    implicit none
-    class(FluidQty), intent(in) :: FldQty
-    real(dp)                    :: VtxVal(4) ! VALues at cell VERtices. VtxVal(1) = x00, VtxVal(2) = x10, VtxVal(3) = x01, VtxVal(4) = x11
-    type(Vec2D)    , intent(in) :: xi ! xi%x(1) = x, xi%x(2) = y
-    real(dp)                    :: x(2), OneMinusX(2)
-    real(dp)                    :: Lerp2D
-    integer, parameter          :: ivtc(8) = [0,1,0,1,0,0,1,1] ! Index array of the cell vertex displacements.
-    integer                     :: ix(2), i
-
-    ! x01   -----------   x11
-    !       |         |
-    !       |         |
-    !       |         |
-    ! x00   -----------   x10
-
-    ! Clamp coordinates to the boundaries.
-    x = min( max(xi % x - FldQty % ost(1:2), 0._dp), real(FldQty % whd - 1.001_dp, dp) )
-
-    ! Prepare interpolation values.
-    ix = aint( x )
-
-    ! We make sure 0 < x < 1
-    x  = x - ix
-
-    ! Values at vertices.
-    do i = 1, 4
-      VtxVal(i) = FldQty % old(ix(1) + ivtc(i) + FldQty % whd(1)*(ix(2) + ivtc(i+4)))
-    end do
-
-    OneMinusX = 1._dp-x
-    Lerp2D = VtxVal(1)*(OneMinusX(1))*(OneMinusX(2)) + &
-             VtxVal(2)*x(1)*(OneMinusX(2))           + &
-             VtxVal(3)*x(2)*(OneMinusX(1))           + &
-             VtxVal(4)*product(x)
-  end function Lerp2D
-!==============================================================================!
-
-!==============================================================================!
-  impure elemental function Lerp3D(FldQty, xi)
-    implicit none
-    class(FluidQty), intent(in) :: FldQty
-    real(dp)                    :: VtxVal(8) ! Values at cell vertices. VtxVal(1) = x000, VtxVal(2) = x100, VtxVal(3) = x010, VtxVal(4) = x110, VtxVal(5) = x001, VtxVal(6) = x101, VtxVal(7) = x011, VtxVal(8) = x111
-    type(Vec3D),     intent(in) :: xi! xi%x(1) = x, xi%x(2) = y, xi%x(3) = z
-    real(dp)                    :: x(3), OneMinusX(3)
-    real(dp)                    :: Lerp3D
-    integer, parameter          :: ivtc(24) = [0,1,0,1,0,1,0,1,0,0,1,1,0,0,1,1,0,0,0,0,1,1,1,1] ! Index array of the cell vertex displacements.
-    integer                     :: ix(3), i
-
-    !    x011   ------------- x111
-    !          /|          /|
-    !         / |         / |
-    !        /  |        /  |
-    ! x010  -------------   | x110
-    !       |   |       |   |
-    !  x001 |   --------|--- x101
-    !       |  /        |  /
-    !       | /         | /
-    !       |/          |/
-    ! x000  ------------- x100
-
-    ! Clamp coordinates to the boundaries.
-    x = min( max(xi % x - FldQty % ost(1:3), 0._dp), real(FldQty % whd - 1.001_dp, dp) )
-
-    ! Prepare interpolation values.
-    ix = aint( x )
-    ! We make sure 0 < x < 1
-    x  = x - ix
-
-    ! Values at vertices.
-    do i = 1, 8
-      VtxVal(1) = FldQty % old(ix(1)+ivtc(i)+FldQty%whd(1)*(ix(2)+ivtc(i+8))+FldQty%whd(1)*FldQty%whd(2)*(ix(3)+ivtc(i+16)))
-    end do
-
-    OneMinusX = 1._dp-x
-    Lerp3D = VtxVal(1)*product(OneMinusX)             + &
-             VtxVal(2)*x(1)*product(OneMinusX(2:3))   + &
-             VtxVal(3)*x(2)*product(OneMinusX(1:3:2)) + &
-             VtxVal(4)*product(x(1:2))*OneMinusX(3)   + &
-             VtxVal(5)*x(3)*product(OneMinusX(1:2))   + &
-             VtxVal(6)*product(x(1:3:2))*OneMinusX(2) + &
-             VtxVal(7)*product(x(2:3))*OneMinusX(1)   + &
-             VtxVal(8)*product(x)
-
-    !Lerp3D = FldQty % Lerp(                            &
-    !            [                                      &
-    !              ! Front face x000, x100, x010, x110
-    !              FldQty % Lerp(                       &
-    !                [                                  &
-    !                  ! Lower edge: x000, x100.
-    !                  FldQty % Lerp(VtxVal(1:2),x(1)), &
-    !                  ! Upper edge: x010, x110.
-    !                  FldQty % Lerp(VtxVal(3:4),x(1))  &
-    !                ]                                , &
-    !                x(2)                               &
-    !                           ),                      &
-    !              ! Back face x001, x101, x011, x111
-    !              FldQty % Lerp(                       &
-    !                [                                  &
-    !                  ! Lower edge: x001, x101.
-    !                  FldQty % Lerp(VtxVal(5:6),x(1)), &
-    !                  ! Upper edge: x011, x111.
-    !                  FldQty % Lerp(VtxVal(7:8),x(1))  &
-    !                ]                                , &
-    !                x(2)                               &
-    !                          )                        &
-    !            ],                                     &
-    !            x(3)                                   &
-    !                      )
-  end function Lerp3D
-!==============================================================================!
+    Cerp2D =  BcC2D(1)  + BcC2D(2)  * xi%x(2) + sum(BcC2D(3:4)   * powX(3:4))            + &
+              (BcC2D(5)  + BcC2D(6)  * xi%x(2) + sum(BcC2D(7:8)   * powX(3:4))) * xi%x(1) + &
+              (BcC2D(9)  + BcC2D(10) * xi%x(2) + sum(BcC2D(11:12) * powX(3:4))) * powX(1) + &
+              (BcC2D(13) + BcC2D(14) * xi%x(2) + sum(BcC2D(15:16) * powX(3:4))) * powX(2)
+  end function Cerp2D
 
 !==============================================================================!
   subroutine MaxTimestep2D(FldSlv, t)
